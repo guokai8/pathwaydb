@@ -126,38 +126,62 @@ class KEGGAnnotationDB:
         gene_ids: Optional[List[str]] = None,
         gene_symbols: Optional[List[str]] = None,
         pathway_ids: Optional[List[str]] = None,
+        pathway_name: Optional[str] = None,
         organism: Optional[str] = None
     ) -> List[KEGGAnnotationRecord]:
-        """Flexible filtering with multiple criteria."""
+        """
+        Flexible filtering with multiple criteria.
+
+        Args:
+            gene_ids: Filter by gene IDs (exact match)
+            gene_symbols: Filter by gene symbols (exact match)
+            pathway_ids: Filter by pathway IDs (exact match)
+            pathway_name: Filter by pathway name (case-insensitive substring match)
+            organism: Filter by organism code
+
+        Returns:
+            List of KEGGAnnotationRecord objects
+
+        Example:
+            >>> db = KEGGAnnotationDB('kegg_human.db')
+            >>> # Find all cancer-related pathways
+            >>> results = db.filter(pathway_name='cancer')
+            >>> # Find specific genes in specific pathways
+            >>> results = db.filter(gene_symbols=['TP53', 'BRCA1'], pathway_name='cancer')
+        """
         conditions = []
         params = []
-        
+
         if gene_ids:
             placeholders = ','.join('?' * len(gene_ids))
             conditions.append(f"gene_id IN ({placeholders})")
             params.extend(gene_ids)
-        
+
         if gene_symbols:
             placeholders = ','.join('?' * len(gene_symbols))
             conditions.append(f"gene_symbol IN ({placeholders})")
             params.extend(gene_symbols)
-        
+
         if pathway_ids:
             placeholders = ','.join('?' * len(pathway_ids))
             conditions.append(f"pathway_id IN ({placeholders})")
             params.extend(pathway_ids)
-        
+
+        if pathway_name:
+            conditions.append("pathway_name LIKE ?")
+            params.append(f"%{pathway_name}%")
+
         if organism:
             conditions.append("organism = ?")
             params.append(organism)
-        
+
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         query = f"""
             SELECT gene_id, gene_symbol, pathway_id, pathway_name, organism
             FROM kegg_annotations
             WHERE {where_clause}
         """
-        
+
         cursor = self.conn.execute(query, params)
         return [KEGGAnnotationRecord(**dict(row)) for row in cursor.fetchall()]
     

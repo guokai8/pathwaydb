@@ -95,12 +95,28 @@ class GO:
         go_ids: Optional[List[str]] = None,
         evidence_codes: Optional[List[str]] = None,
         aspect: Optional[str] = None,
-        namespace: Optional[str] = None
+        namespace: Optional[str] = None,
+        term_name: Optional[str] = None
     ):
         """
         Filter GO annotations by various criteria.
 
+        Args:
+            gene_symbols: Filter by gene symbols
+            go_ids: Filter by GO term IDs
+            evidence_codes: Filter by evidence codes
+            aspect: Filter by aspect code (P/F/C)
+            namespace: Filter by namespace (biological_process/molecular_function/cellular_component)
+            term_name: Filter by term name (case-insensitive substring match)
+
         Note: 'namespace' is an alias for 'aspect' for user convenience.
+
+        Example:
+            >>> go = GO(storage_path='go_human.db')
+            >>> # Find DNA repair terms
+            >>> dna_repair = go.filter(term_name='DNA repair')
+            >>> # Find TP53 apoptosis annotations
+            >>> tp53_apoptosis = go.filter(gene_symbols=['TP53'], term_name='apoptosis')
         """
         if not self.storage:
             raise ValueError("No storage configured")
@@ -118,7 +134,8 @@ class GO:
             gene_symbols=gene_symbols,
             go_ids=go_ids,
             evidence_codes=evidence_codes,
-            aspect=aspect
+            aspect=aspect,
+            term_name=term_name
         )
 
     def to_dataframe(self, limit: Optional[int] = None):
@@ -141,6 +158,25 @@ class GO:
             raise ValueError("No storage configured. Set storage_path in __init__")
 
         return self.storage.to_dataframe(limit=limit)
+
+    def populate_term_names(self):
+        """
+        Fetch and populate GO term names from QuickGO API.
+
+        This method downloads term names for all unique GO IDs in the database.
+        Term names enable filtering by description instead of just GO IDs.
+
+        Example:
+            >>> go = GO(storage_path='go_human.db')
+            >>> go.download_annotations(species='human')
+            >>> go.populate_term_names()  # Fetch term names
+            >>> # Now you can filter by term name
+            >>> dna_repair = go.filter(term_name='DNA repair')
+        """
+        if not self.storage:
+            raise ValueError("No storage configured. Set storage_path in __init__")
+
+        return self.storage.populate_term_names()
 
     def stats(self):
         """Get database statistics."""

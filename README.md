@@ -72,7 +72,7 @@ kegg = KEGG(species='hsa', storage_path='kegg_human.db')
 # Download all pathway annotations (first time only - takes ~2 minutes)
 kegg.download_annotations()
 # Output: Downloaded 8,000+ pathway-gene annotations
-kegg.convert_ids_to_symbols()
+
 # Query pathways for a specific gene
 results = kegg.query_by_gene('TP53')
 print(f"TP53 is in {len(results)} pathways")
@@ -122,6 +122,31 @@ for ann in annotations[:3]:
 # Filter by namespace (biological_process, molecular_function, cellular_component)
 bp_terms = go.filter(namespace='biological_process')
 print(f"Biological Process annotations: {len(bp_terms)}")
+
+# Filter by evidence codes (experimental evidence only)
+exp_annotations = go.filter(evidence_codes=['EXP', 'IDA', 'IPI', 'IMP'])
+print(f"Experimental evidence: {len(exp_annotations)}")
+
+# Combine filters: TP53 + biological_process + experimental evidence
+tp53_bp_exp = go.filter(
+    gene_symbols=['TP53'],
+    namespace='biological_process',
+    evidence_codes=['EXP', 'IDA', 'IPI']
+)
+print(f"TP53 biological processes (experimental): {len(tp53_bp_exp)}")
+
+# NEW FEATURE: Filter by term name/description (like KEGG pathway names!)
+# First, populate term names from QuickGO API (one-time setup)
+go.populate_term_names()  # Fetches GO term descriptions
+
+# Now you can search by term description (case-insensitive substring match)
+dna_repair = go.filter(term_name='DNA repair')
+apoptosis = go.filter(term_name='apoptosis')
+transcription = go.filter(term_name='transcription')
+
+# Combine term name with other filters
+tp53_dna = go.filter(gene_symbols=['TP53'], term_name='DNA')
+print(f"TP53 DNA-related terms: {len(tp53_dna)}")
 
 # Export to DataFrame format
 df_data = go.to_dataframe()
@@ -208,8 +233,20 @@ from pathwaydb.storage import KEGGAnnotationDB
 # Load existing database
 db = KEGGAnnotationDB('kegg_human.db')
 
-# Query with filters
+# Query with filters - search by pathway name (case-insensitive substring match)
 results = db.filter(pathway_name='cancer')
+print(f"Found {len(results)} annotations in cancer-related pathways")
+# Output: Found 2389 annotations in cancer-related pathways
+
+# Combine multiple filters
+cancer_tp53 = db.filter(pathway_name='cancer', gene_symbols=['TP53'])
+print(f"TP53 in {len(cancer_tp53)} cancer pathways")
+# Output: TP53 in 15 cancer pathways
+
+# Other filter options
+metabolism = db.filter(pathway_name='metabolism')
+specific_genes = db.filter(gene_symbols=['TP53', 'BRCA1', 'EGFR'])
+specific_pathways = db.filter(pathway_ids=['hsa04110', 'hsa04115'])
 
 # Export to different formats
 records = db.to_records()  # List of dicts
@@ -217,8 +254,9 @@ gene_sets = db.to_gene_sets()  # For enrichment tools
 
 # Database statistics
 stats = db.stats()
-print(f"Total pathways: {stats['total_pathways']}")
-print(f"Total genes: {stats['total_genes']}")
+print(f"Total annotations: {stats['total_annotations']}")
+print(f"Unique pathways: {stats['unique_pathways']}")
+print(f"Unique genes: {stats['unique_genes']}")
 ```
 
 ### Custom Caching

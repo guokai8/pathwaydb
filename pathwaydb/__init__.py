@@ -1,6 +1,6 @@
 """pathwaydb: Pathway and Gene Set Database Toolkit."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from pathwaydb.connectors.kegg import KEGG
 from pathwaydb.connectors.go import GO
