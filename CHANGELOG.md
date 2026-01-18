@@ -8,26 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] - 2026-01-18
 
 ### Added
-- **Description-based filtering** for both KEGG and GO annotations
+- **Unified filtering system** across all three databases (KEGG, GO, MSigDB)
+- **Description-based filtering** for KEGG, GO, and MSigDB annotations
 - `pathway_name` parameter in KEGG `filter()` method for case-insensitive substring search
 - `term_name` parameter in GO `filter()` method for case-insensitive substring search
+- `gene_set_name` and `description` parameters in MSigDB `filter()` method
 - `populate_term_names()` method for GO to fetch term descriptions from QuickGO API
 - GO term name storage in database with indexed column for fast filtering
 - `to_dataframe()` method for KEGG returning GeneID, PATH, Annot columns
 - `to_dataframe()` method for GO returning GeneID, TERM, Aspect, Evidence columns
+- `to_dataframe()` method for MSigDB returning GeneID, GeneSet, Collection, Description columns
 - `query_by_gene()` method for KEGG and GO connectors
-- `stats()` method for KEGG and GO connectors
+- `stats()` method for KEGG, GO, and MSigDB connectors
 - Comprehensive filter examples and documentation
 
 ### Enhanced
 - GO filter now supports filtering by gene symbols, GO IDs, evidence codes, namespace, and term names
-- All filters can be combined for complex queries
+- MSigDB filter now supports filtering by gene symbols, gene set name, description, collection, and organism
+- All filters can be combined for complex queries across all databases
+- Consistent API design across KEGG, GO, and MSigDB
 
 ### Documentation
 - Added GO_TERM_NAME_GUIDE.md with complete term name filtering guide
 - Added FILTERING_SUMMARY.md with side-by-side KEGG vs GO comparison
 - Added FILTER_GUIDE.md with detailed filter comparison
-- Added example scripts: go_filter_examples.py, test_go_term_name_filter.py
+- Added example scripts: go_filter_examples.py, test_go_term_name_filter.py, test_msigdb_filter.py
 
 ## [0.1.0] - 2026-01-18
 

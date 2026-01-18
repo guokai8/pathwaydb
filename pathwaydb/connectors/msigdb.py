@@ -41,14 +41,15 @@ class MSigDB:
         """
         self.base_url = "https://www.gsea-msigdb.org/gsea/msigdb"
         self.client = HTTPClient(cache_dir=cache_dir, rate_limit=DEFAULT_RATE_LIMIT)
-        
+
         if storage_path:
             self.storage_path = Path(storage_path)
         else:
             self.storage_path = Path('.pathwaydb_cache') / 'msigdb.db'
-        
+
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_storage()
+        self.storage = None  # Will be lazy-loaded when needed
     
     def _init_storage(self):
         """Initialize SQLite storage."""
@@ -435,37 +436,90 @@ class MSigDB:
         conn.close()
         return result
 
+    def _get_storage(self):
+        """Lazy-load storage instance."""
+        if self.storage is None:
+            from ..storage.msigdb_db import MSigDBAnnotationDB
+            self.storage = MSigDBAnnotationDB(str(self.storage_path))
+        return self.storage
+
+    def filter(
+        self,
+        gene_symbols: Optional[List[str]] = None,
+        gene_set_name: Optional[str] = None,
+        description: Optional[str] = None,
+        collection: Optional[str] = None,
+        organism: Optional[str] = None
+    ):
+        """
+        Filter gene sets by multiple criteria.
+
+        Args:
+            gene_symbols: List of gene symbols (returns sets containing ANY of these genes)
+            gene_set_name: Gene set name substring (case-insensitive)
+            description: Description substring (case-insensitive)
+            collection: Collection code (H, C1, C2, etc.)
+            organism: Organism name (human, mouse)
+
+        Returns:
+            List of matching MSigDBRecord objects
+
+        Example:
+            msigdb = MSigDB(storage_path='msigdb.db')
+
+            # Find Hallmark apoptosis gene sets
+            results = msigdb.filter(gene_set_name='apoptosis', collection='H')
+
+            # Find gene sets containing TP53
+            results = msigdb.filter(gene_symbols=['TP53'])
+
+            # Complex query
+            results = msigdb.filter(
+                gene_symbols=['TP53', 'MYC'],
+                collection='C2',
+                description='cancer'
+            )
+        """
+        storage = self._get_storage()
+        return storage.filter(
+            gene_symbols=gene_symbols,
+            gene_set_name=gene_set_name,
+            description=description,
+            collection=collection,
+            organism=organism
+        )
+
+    def to_dataframe(self, collection: Optional[str] = None) -> List[Dict]:
+        """
+        Export gene sets in DataFrame-compatible format for enrichment analysis.
+
+        Format: Each row is a gene-to-geneset mapping
+        Columns: GeneID, GeneSet, Collection, Description
+
+        Args:
+            collection: Optional collection filter (H, C1, C2, etc.)
+
+        Returns:
+            List of dicts with keys: GeneID, GeneSet, Collection, Description
+
+        Example:
+            import pandas as pd
+
+            msigdb = MSigDB(storage_path='msigdb.db')
+            data = msigdb.to_dataframe(collection='H')
+            df = pd.DataFrame(data)
+
+            # Use for enrichment analysis
+            print(df.head())
+            #   GeneID              GeneSet Collection  Description
+            # 0   ABCA1  HALLMARK_ADIPOGENESIS          H  Genes up-regulated...
+            # 1   ABCB8  HALLMARK_ADIPOGENESIS          H  Genes up-regulated...
+        """
+        storage = self._get_storage()
+        return storage.to_dataframe(collection=collection)
+
     def stats(self) -> Dict:
         """Get database statistics."""
-        conn = sqlite3.connect(str(self.storage_path))
-        conn.row_factory = sqlite3.Row  # Enable Row factory
-    
-        cursor = conn.execute("""
-            SELECT 
-                COUNT(*) as total_gene_sets,
-                COUNT(DISTINCT collection) as total_collections,
-                COUNT(DISTINCT organism) as organisms
-            FROM gene_sets
-        """)
-        row = cursor.fetchone()
-    
-    # Convert Row to dict properly
-        stats = {
-            'total_gene_sets': row['total_gene_sets'],
-            'total_collections': row['total_collections'],
-            'organisms': row['organisms']
-        }
-    
-    # Collection breakdown
-        cursor = conn.execute("""
-            SELECT collection, COUNT(*) as count
-            FROM gene_sets
-            GROUP BY collection
-            ORDER BY collection
-        """)
-    
-        stats['by_collection'] = {row['collection']: row['count'] for row in cursor.fetchall()}
-    
-        conn.close()
-        return stats    
+        storage = self._get_storage()
+        return storage.stats()    
 
