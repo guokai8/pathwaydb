@@ -550,7 +550,7 @@ If you use PathwayDB in your research, please cite:
 - [mygene](https://github.com/biothings/mygene.py) - Gene annotation queries
 - [bioservices](https://github.com/cokelaer/bioservices) - Comprehensive bio web services
 - [gprofiler](https://github.com/gprofiler/gprofiler) - Functional enrichment analysis
-- [gseapy](https://github.com/zqfang/GSEApy) - GSEA in Python
+- [pygsva](https://github.com/guokai8/pygsva) - GSVA in Python
 
 ---
 
