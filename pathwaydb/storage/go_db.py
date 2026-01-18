@@ -259,66 +259,115 @@ class GOAnnotationDB:
 
         return dict(cursor.fetchone())
 
-    def populate_term_names(self):
+    def populate_term_names(self, use_bundled_data: bool = True):
         """
-        Fetch and populate GO term names from QuickGO API.
+        Populate GO term names in the database.
 
-        This downloads term names for all unique GO IDs in the database
-        and updates the term_name column in go_annotations table.
+        This method tries to use bundled term name data from the package first,
+        then falls back to QuickGO API if needed.
+
+        Args:
+            use_bundled_data: If True, use bundled package data (default: True)
+                             Set to False to force QuickGO API calls
         """
         import json
         import time
 
-        # Get unique GO terms
+        # Get unique GO terms that need names
         cursor = self.conn.execute("SELECT DISTINCT go_id FROM go_annotations WHERE term_name IS NULL")
         go_ids = [row[0] for row in cursor.fetchall()]
 
         if not go_ids:
-            print("All GO terms already have names populated")
+            print("✓ All GO terms already have names populated")
             return
 
-        print(f"Fetching names for {len(go_ids)} GO terms from QuickGO API...")
+        print(f"Populating names for {len(go_ids)} GO terms...")
 
-        # Fetch term names from QuickGO API (batch API)
-        base_url = "https://www.ebi.ac.uk/QuickGO/services/ontology/go/terms"
-
-        # Process in batches of 100
-        batch_size = 100
+        # Try bundled data first
         total_updated = 0
-
-        for i in range(0, len(go_ids), batch_size):
-            batch = go_ids[i:i+batch_size]
-            ids_param = ",".join(batch)
-
+        if use_bundled_data:
             try:
-                url = f"{base_url}/{ids_param}"
-                with urlopen(url, timeout=30) as response:
-                    data = json.loads(response.read().decode('utf-8'))
+                from ..data import load_go_term_names, has_go_term_names
 
-                    if 'results' in data:
-                        for result in data['results']:
-                            go_id = result.get('id')
-                            term_name = result.get('name')
+                if has_go_term_names():
+                    print("  Using bundled term name data (instant!)...")
+                    term_names = load_go_term_names()
 
-                            if go_id and term_name:
-                                # Update annotations with this GO ID
-                                self.conn.execute(
-                                    "UPDATE go_annotations SET term_name = ? WHERE go_id = ?",
-                                    (term_name, go_id)
-                                )
-                                total_updated += 1
+                    # Update all terms from bundled data
+                    for go_id in go_ids:
+                        term_name = term_names.get(go_id)
+                        if term_name:
+                            self.conn.execute(
+                                "UPDATE go_annotations SET term_name = ? WHERE go_id = ?",
+                                (term_name, go_id)
+                            )
+                            total_updated += 1
 
-                self.conn.commit()
-                print(f"  Processed {min(i+batch_size, len(go_ids))}/{len(go_ids)} terms...")
+                    self.conn.commit()
+                    print(f"  ✓ Updated {total_updated}/{len(go_ids)} terms from bundled data")
 
-                # Rate limiting
-                time.sleep(0.2)
+                    # Check if we got all terms
+                    cursor = self.conn.execute("SELECT DISTINCT go_id FROM go_annotations WHERE term_name IS NULL")
+                    remaining = [row[0] for row in cursor.fetchall()]
+
+                    if not remaining:
+                        print(f"✓ All GO term names populated successfully!")
+                        return
+                    else:
+                        print(f"  Note: {len(remaining)} terms not found in bundled data")
+                        go_ids = remaining  # Continue with QuickGO API for remaining
+
+                else:
+                    print("  Note: Bundled term name data not found, using QuickGO API...")
 
             except Exception as e:
-                print(f"  Warning: Failed to fetch batch {i//batch_size + 1}: {e}")
-                continue
+                print(f"  Warning: Could not use bundled data: {e}")
+                print("  Falling back to QuickGO API...")
 
-        print(f"✓ Updated {total_updated} GO term names")
+        # Fetch remaining terms from QuickGO API
+        if go_ids:
+            print(f"  Fetching {len(go_ids)} terms from QuickGO API...")
+            base_url = "https://www.ebi.ac.uk/QuickGO/services/ontology/go/terms"
+
+            # Process in batches of 100
+            batch_size = 100
+            api_updated = 0
+
+            for i in range(0, len(go_ids), batch_size):
+                batch = go_ids[i:i+batch_size]
+                ids_param = ",".join(batch)
+
+                try:
+                    url = f"{base_url}/{ids_param}"
+                    with urlopen(url, timeout=30) as response:
+                        data = json.loads(response.read().decode('utf-8'))
+
+                        if 'results' in data:
+                            for result in data['results']:
+                                go_id = result.get('id')
+                                term_name = result.get('name')
+
+                                if go_id and term_name:
+                                    self.conn.execute(
+                                        "UPDATE go_annotations SET term_name = ? WHERE go_id = ?",
+                                        (term_name, go_id)
+                                    )
+                                    api_updated += 1
+
+                    self.conn.commit()
+                    print(f"    Processed {min(i+batch_size, len(go_ids))}/{len(go_ids)} terms from API...")
+
+                    # Rate limiting
+                    time.sleep(0.2)
+
+                except Exception as e:
+                    print(f"    Warning: Failed to fetch batch {i//batch_size + 1}: {e}")
+                    continue
+
+            total_updated += api_updated
+            print(f"  ✓ Updated {api_updated} terms from QuickGO API")
+
+        print(f"✓ Total: {total_updated} GO term names populated")
 
     def close(self):
         """Close database connection."""
@@ -418,4 +467,167 @@ def download_go_annotations_filtered(
 def load_go_annotations(db_path: str) -> GOAnnotationDB:
     """Load existing GO annotation database."""
     return GOAnnotationDB(db_path)
+
+
+def get_cache_path(species: str = 'human') -> str:
+    """Get the default cache path for GO annotations."""
+    from pathlib import Path
+    cache_dir = Path.home() / '.pathwaydb_cache' / 'go_annotations'
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return str(cache_dir / f'go_{species}_cached.db')
+
+
+def download_to_cache(
+    species: str = 'human',
+    evidence_codes: Optional[List[str]] = None,
+    fetch_term_names: bool = True,
+    force_refresh: bool = False
+) -> str:
+    """
+    Download GO annotations to a centralized cache location.
+
+    This allows you to download once and reuse across multiple projects.
+
+    Args:
+        species: Species name ('human', 'mouse', 'rat')
+        evidence_codes: Optional list of evidence codes to filter by
+        fetch_term_names: If True, fetch term names from QuickGO API (default: True)
+        force_refresh: If True, re-download even if cache exists
+
+    Returns:
+        Path to the cached database file
+
+    Example:
+        # Download once to cache
+        cache_path = download_to_cache(species='human')
+        print(f"GO annotations cached at: {cache_path}")
+
+        # Use the cache in your project
+        db = load_from_cache(species='human')
+        annotations = db.filter(gene_symbols=['TP53'])
+    """
+    import shutil
+
+    cache_path = get_cache_path(species)
+
+    # Check if cache exists and we're not forcing refresh
+    if not force_refresh:
+        from pathlib import Path
+        if Path(cache_path).exists():
+            # Check if it has data
+            test_db = sqlite3.connect(cache_path)
+            cursor = test_db.execute("SELECT COUNT(*) FROM go_annotations")
+            count = cursor.fetchone()[0]
+            test_db.close()
+
+            if count > 0:
+                print(f"✓ GO annotations for {species} already cached ({count:,} annotations)")
+                print(f"  Cache location: {cache_path}")
+                print(f"  Use force_refresh=True to re-download")
+                return cache_path
+
+    print(f"Downloading GO annotations for {species} to cache...")
+    print(f"Cache location: {cache_path}")
+
+    # Download to cache
+    download_go_annotations_filtered(
+        species=species,
+        evidence_codes=evidence_codes,
+        output_path=cache_path,
+        return_db=False
+    )
+
+    # Fetch term names if requested
+    if fetch_term_names:
+        print("\nFetching GO term names from QuickGO API...")
+        print("(This takes a few minutes but only needs to be done once)")
+
+        from ..connectors.go import GO
+        go = GO(storage_path=cache_path)
+        go.populate_term_names()
+        print("✓ Term names populated in cache!")
+
+    print(f"\n✓ GO annotations cached successfully at: {cache_path}")
+    return cache_path
+
+
+def load_from_cache(species: str = 'human') -> GOAnnotationDB:
+    """
+    Load GO annotations from the centralized cache.
+
+    If the cache doesn't exist, it will be downloaded automatically.
+
+    Args:
+        species: Species name ('human', 'mouse', 'rat')
+
+    Returns:
+        GOAnnotationDB instance connected to the cached database
+
+    Example:
+        # Load from cache (downloads automatically if not cached)
+        db = load_from_cache(species='human')
+
+        # Query directly from cache
+        annotations = db.filter(gene_symbols=['TP53'])
+        print(f"Found {len(annotations)} TP53 annotations")
+    """
+    cache_path = get_cache_path(species)
+
+    # Check if cache exists
+    from pathlib import Path
+    if not Path(cache_path).exists():
+        print(f"Cache not found for {species}. Downloading...")
+        download_to_cache(species=species, fetch_term_names=True)
+
+    return GOAnnotationDB(cache_path)
+
+
+def copy_from_cache(
+    species: str = 'human',
+    output_path: str = 'go_annotations.db',
+    download_if_missing: bool = True
+) -> GOAnnotationDB:
+    """
+    Copy GO annotations from cache to a project-specific database.
+
+    This is useful when you want a local copy that won't be affected
+    by cache updates.
+
+    Args:
+        species: Species name ('human', 'mouse', 'rat')
+        output_path: Path for the copied database
+        download_if_missing: If True, download to cache if not found
+
+    Returns:
+        GOAnnotationDB instance connected to the copied database
+
+    Example:
+        # Copy cache to project database
+        db = copy_from_cache(species='human', output_path='my_project_go.db')
+
+        # Now you have a local copy independent of the cache
+        annotations = db.filter(gene_symbols=['TP53'])
+    """
+    import shutil
+    from pathlib import Path
+
+    cache_path = get_cache_path(species)
+
+    # Download to cache if missing
+    if not Path(cache_path).exists():
+        if download_if_missing:
+            print(f"Cache not found for {species}. Downloading...")
+            download_to_cache(species=species, fetch_term_names=True)
+        else:
+            raise FileNotFoundError(
+                f"GO annotations cache not found for {species}. "
+                f"Run download_to_cache('{species}') first or set download_if_missing=True"
+            )
+
+    # Copy cache to output path
+    print(f"Copying GO annotations from cache to {output_path}...")
+    shutil.copy2(cache_path, output_path)
+    print(f"✓ Copied {cache_path} to {output_path}")
+
+    return GOAnnotationDB(output_path)
 

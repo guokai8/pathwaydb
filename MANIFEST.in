@@ -11,10 +11,17 @@ include requirements-dev.txt
 exclude .gitignore
 exclude .DS_Store
 
-# Exclude cache and database files
+# Include bundled data files
+include pathwaydb/data/go_term_names.json
+recursive-include pathwaydb/data *.db
+
+# Exclude cache and development database files
 global-exclude *.pyc
 global-exclude *.pyo
 global-exclude __pycache__
-global-exclude *.db
-global-exclude *.sqlite
-global-exclude .cache
+prune .cache
+prune *_cache
+
+# Exclude test/example databases (but keep package data)
+exclude *.db
+exclude *.sqlite

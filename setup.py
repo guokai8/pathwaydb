@@ -23,6 +23,13 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/guokai8/pathwaydb",
     packages=find_packages(),
+    package_data={
+        'pathwaydb': [
+            'data/go_term_names.json',   # Include GO term name mapping (lightweight)
+            'data/go_annotations/*.db',  # Optional: Include full GO databases (if prepared)
+        ],
+    },
+    include_package_data=True,
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",

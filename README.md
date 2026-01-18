@@ -24,6 +24,7 @@ A lightweight Python library for querying and storing biological pathway and gen
 
 ## Table of Contents
 
+- [What's New](#whats-new-in-v020)
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
@@ -32,13 +33,50 @@ A lightweight Python library for querying and storing biological pathway and gen
 - [Advanced Usage](#advanced-usage)
 - [Documentation](#documentation)
 
+## What's New in v0.2.0
+
+🎉 **Major update with game-changing features!**
+
+- **🔍 Search by Description**: Filter pathways/terms by name instead of remembering IDs
+  ```python
+  # KEGG
+  cancer = kegg.filter(pathway_name='cancer')
+
+  # GO
+  dna_repair = go.filter(term_name='DNA repair')
+
+  # MSigDB
+  apoptosis = msigdb.filter(gene_set_name='apoptosis')
+  ```
+
+- **⚡ Instant GO Term Names**: ~1.5 MB mapping bundled with package - no downloads needed!
+  ```python
+  go.download_annotations(species='human')  # Term names included automatically!
+  ```
+
+- **💾 Centralized Caching**: Download once, use across all projects
+  ```python
+  go = GO.from_cache(species='human')  # Loads from shared cache
+  ```
+
+- **📊 Complete DataFrame Export**: All databases support pandas-compatible export
+  ```python
+  df_data = kegg.to_dataframe()  # GeneID, PATH, Annot
+  df_data = go.to_dataframe()    # GeneID, TERM, Aspect, Evidence
+  df_data = msigdb.to_dataframe()  # GeneID, GeneSet, Collection, Description
+  ```
+
+See [CHANGELOG.md](CHANGELOG.md) for complete details.
+
 ## Features
 
 - ✅ **Multiple Database Support**: KEGG, Gene Ontology (GO), and MSigDB
 - ✅ **Zero External Dependencies**: Uses only Python standard library
+- ✅ **Description-Based Filtering**: Search by pathway/term names, not just IDs
+- ✅ **Bundled GO Term Names**: ~1.5 MB mapping included for instant term name access
 - ✅ **Local SQLite Storage**: Download once, query offline forever
 - ✅ **DataFrame Export**: Export to pandas-compatible format (like clusterProfiler)
-- ✅ **Smart Caching**: HTTP response caching and gene ID mapping cache
+- ✅ **Smart Caching**: HTTP response caching and centralized annotation cache
 - ✅ **Rate Limiting**: Built-in rate limiting for respectful API usage
 - ✅ **Gene ID Conversion**: Convert between Entrez, Symbol, Ensembl, and UniProt IDs
 - ✅ **Fast Queries**: Millisecond-level queries on local databases
@@ -72,7 +110,7 @@ kegg = KEGG(species='hsa', storage_path='kegg_human.db')
 # Download all pathway annotations (first time only - takes ~2 minutes)
 kegg.download_annotations()
 # Output: Downloaded 8,000+ pathway-gene annotations
-kegg.convert_ids_to_symbols()
+
 # Query pathways for a specific gene
 results = kegg.query_by_gene('TP53')
 print(f"TP53 is in {len(results)} pathways")
@@ -85,12 +123,22 @@ for pathway in results[:3]:
 #   hsa04115: p53 signaling pathway
 #   hsa04110: Cell cycle
 
+# NEW: Filter by pathway name (case-insensitive substring match)
+cancer_pathways = kegg.filter(pathway_name='cancer')
+print(f"Found {len(cancer_pathways)} cancer-related annotations")
+# Output: Found 2,389 cancer-related annotations
+
+# Combine filters: specific gene + pathway name
+tp53_cancer = kegg.filter(gene_symbols=['TP53'], pathway_name='cancer')
+print(f"TP53 in {len(tp53_cancer)} cancer pathway annotations")
+# Output: TP53 in 15 cancer pathway annotations
+
 # Get database statistics
 stats = kegg.stats()
 print(stats)
 # Output: {'total_annotations': 8234, 'unique_genes': 7894, 'unique_pathways': 354}
 
-# Export to DataFrame format (NEW!)
+# Export to DataFrame format
 df_data = kegg.to_dataframe()
 # Returns: [{'GeneID': 'TP53', 'PATH': 'hsa05200', 'Annot': 'Pathways in cancer'}, ...]
 ```
@@ -104,20 +152,30 @@ from pathwaydb import GO
 go = GO(storage_path='go_human.db')
 
 # Download GO annotations (first time only)
+# Term names are automatically populated from bundled data!
 go.download_annotations(species='human')
 # Output: Downloaded 500,000+ gene-term annotations
-go.populate_term_names()
+#         Populating GO term names from bundled data (instant!)
+
 # Query GO terms for a specific gene
 annotations = go.query_by_gene('BRCA1')
 print(f"BRCA1 has {len(annotations)} GO annotations")
 # Output: BRCA1 has 156 GO annotations
 
+# Term names are already available!
 for ann in annotations[:3]:
-    print(f"  {ann.go_id}: {ann.aspect} [{ann.evidence_code}]")
+    print(f"  {ann.go_id}: {ann.term_name} [{ann.evidence_code}]")
 # Output:
-#   GO:0006281: P [IBA]  (DNA repair)
-#   GO:0006355: P [TAS]  (regulation of transcription)
-#   GO:0005515: F [IPI]  (protein binding)
+#   GO:0006281: DNA repair [IBA]
+#   GO:0006355: regulation of transcription, DNA-templated [TAS]
+#   GO:0005515: protein binding [IPI]
+
+# NEW: Filter by term name (case-insensitive substring match)
+dna_repair = go.filter(term_name='DNA repair')
+apoptosis = go.filter(term_name='apoptosis')
+transcription = go.filter(term_name='transcription')
+print(f"Found {len(dna_repair)} DNA repair annotations")
+# Output: Found 45,234 DNA repair annotations
 
 # Filter by namespace (biological_process, molecular_function, cellular_component)
 bp_terms = go.filter(namespace='biological_process')
@@ -127,26 +185,14 @@ print(f"Biological Process annotations: {len(bp_terms)}")
 exp_annotations = go.filter(evidence_codes=['EXP', 'IDA', 'IPI', 'IMP'])
 print(f"Experimental evidence: {len(exp_annotations)}")
 
-# Combine filters: TP53 + biological_process + experimental evidence
-tp53_bp_exp = go.filter(
+# Combine filters: TP53 + term name + experimental evidence
+tp53_dna_exp = go.filter(
     gene_symbols=['TP53'],
-    namespace='biological_process',
-    evidence_codes=['EXP', 'IDA', 'IPI']
+    term_name='DNA',
+    evidence_codes=['EXP', 'IDA']
 )
-print(f"TP53 biological processes (experimental): {len(tp53_bp_exp)}")
-
-# NEW FEATURE: Filter by term name/description (like KEGG pathway names!)
-# First, populate term names from QuickGO API (one-time setup)
-go.populate_term_names()  # Fetches GO term descriptions
-
-# Now you can search by term description (case-insensitive substring match)
-dna_repair = go.filter(term_name='DNA repair')
-apoptosis = go.filter(term_name='apoptosis')
-transcription = go.filter(term_name='transcription')
-
-# Combine term name with other filters
-tp53_dna = go.filter(gene_symbols=['TP53'], term_name='DNA')
-print(f"TP53 DNA-related terms: {len(tp53_dna)}")
+print(f"TP53 DNA-related (experimental): {len(tp53_dna_exp)}")
+# Output: TP53 DNA-related (experimental): 12
 
 # Export to DataFrame format
 df_data = go.to_dataframe()
@@ -159,19 +205,39 @@ df_data = go.to_dataframe()
 from pathwaydb import MSigDB
 
 # Initialize MSigDB client
-msigdb = MSigDB(species='human', storage_path='msigdb.db')
+msigdb = MSigDB(storage_path='msigdb.db')
 
 # Download specific collections
 msigdb.download_collection('H')  # Hallmark gene sets
 msigdb.download_collection('C2')  # Curated gene sets (KEGG, Reactome, etc.)
 
-# Search gene sets
-results = msigdb.search_gene_sets('interferon')
-for gs in results:
-    print(f"{gs.name}: {len(gs.genes)} genes")
+# NEW: Filter by gene set name (case-insensitive substring match)
+apoptosis_sets = msigdb.filter(gene_set_name='apoptosis')
+print(f"Found {len(apoptosis_sets)} apoptosis gene sets")
+# Output: Found 15 apoptosis gene sets
 
-# Query by gene
-gene_sets = msigdb.query_by_gene('STAT1')
+# Filter by description
+immune_sets = msigdb.filter(description='immune')
+print(f"Found {len(immune_sets)} immune-related gene sets")
+
+# Filter by collection
+hallmark_sets = msigdb.filter(collection='H')
+print(f"Found {len(hallmark_sets)} Hallmark gene sets")
+
+# Query gene sets containing specific genes
+tp53_sets = msigdb.filter(gene_symbols=['TP53'])
+print(f"TP53 in {len(tp53_sets)} gene sets")
+
+# Combine filters
+hallmark_interferon = msigdb.filter(
+    collection='H',
+    gene_set_name='interferon'
+)
+print(f"Hallmark interferon sets: {len(hallmark_interferon)}")
+
+# Export to DataFrame format
+df_data = msigdb.to_dataframe(collection='H')
+# Returns: [{'GeneID': 'TP53', 'GeneSet': 'HALLMARK_APOPTOSIS', 'Collection': 'H', 'Description': '...'}, ...]
 ```
 
 ### Gene ID Conversion
@@ -457,25 +523,48 @@ mypy pathwaydb/
 
 ## Documentation
 
+### Guides
+
+**Feature Guides:**
+- [DATABASE_FILTERING_GUIDE.md](DATABASE_FILTERING_GUIDE.md) - Complete filtering guide for all databases
+- [GO_TERM_NAME_GUIDE.md](GO_TERM_NAME_GUIDE.md) - GO term name filtering
+- [GO_CACHE_GUIDE.md](GO_CACHE_GUIDE.md) - Centralized caching system
+- [GO_TERM_NAMES_PACKAGING.md](GO_TERM_NAMES_PACKAGING.md) - How bundled term names work
+
+**Developer Guides:**
+- [CLAUDE.md](CLAUDE.md) - Architecture and development guidelines
+- [PACKAGING_GUIDE.md](PACKAGING_GUIDE.md) - Building and packaging instructions
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
+
 ### API Reference
 
 **Main Classes:**
 - `KEGG(species, storage_path, cache_dir)` - KEGG pathway database client
 - `GO(storage_path, cache_dir)` - Gene Ontology client
-- `MSigDB(species, storage_path, cache_dir)` - MSigDB gene sets client
+  - `GO.from_cache(species)` - Load from centralized cache
+  - `GO.load(species)` - Auto-detect best source (bundled > cache > download)
+- `MSigDB(storage_path, cache_dir)` - MSigDB gene sets client
 - `IDConverter(species, cache_path)` - Gene ID converter
 
 **Key Methods:**
-- `download_annotations()` - Download and store annotations
+- `download_annotations()` - Download and store annotations (auto-populates term names for GO)
 - `query_by_gene(gene)` - Query annotations for a specific gene
 - `to_dataframe(limit)` - Export to pandas-compatible format
 - `filter(**criteria)` - Filter annotations by various criteria
+  - KEGG: `pathway_name`, `gene_symbols`, `pathway_ids`, `organism`
+  - GO: `term_name`, `gene_symbols`, `go_ids`, `namespace`, `evidence_codes`
+  - MSigDB: `gene_set_name`, `description`, `gene_symbols`, `collection`
 - `stats()` - Get database statistics
-- `export_gene_sets()` - Export as gene sets dictionary
+- `populate_term_names()` - Manually populate GO term names (uses bundled data)
 
 **Storage Classes:**
 - `KEGGAnnotationDB(db_path)` - Direct access to KEGG storage
 - `GOAnnotationDB(db_path)` - Direct access to GO storage
+
+**Package Data Functions:**
+- `load_go_term_names()` - Load bundled GO term name mapping
+- `download_to_cache(species)` - Download GO annotations to centralized cache
+- `load_from_cache(species)` - Load GO annotations from cache
 
 For detailed architecture and development guidelines, see [CLAUDE.md](CLAUDE.md).
 
@@ -484,6 +573,9 @@ For detailed architecture and development guidelines, see [CLAUDE.md](CLAUDE.md)
 See the `examples/` directory for comprehensive usage examples:
 - `examples/quickstart.py` - Basic usage for all databases
 - `examples/dataframe_export.py` - DataFrame export and analysis
+- `examples/go_filter_examples.py` - GO filtering examples
+- `test_go_cache.py` - Centralized caching examples
+- `test_msigdb_filter.py` - MSigDB filtering examples
 
 ## Contributing
 
@@ -529,11 +621,19 @@ If you use PathwayDB in your research, please cite:
 
 ## Roadmap
 
-**Version 0.2.0** (Planned):
+**Version 0.2.0** (Released):
+- ✅ Description-based filtering for KEGG, GO, and MSigDB
+- ✅ Bundled GO term name mapping (~1.5 MB)
+- ✅ Automatic term name population
+- ✅ Centralized caching system
+- ✅ Enhanced DataFrame export for all databases
+- ✅ Unified filtering API across databases
+
+**Version 0.3.0** (Planned):
 - [ ] WikiPathways connector
-- [ ] Enhanced DataFrame export with metadata
 - [ ] Batch download utilities
 - [ ] Comprehensive test suite
+- [ ] Performance optimizations
 
 **Future Considerations** (based on user feedback):
 - [ ] STRING protein-protein interactions
@@ -550,7 +650,7 @@ If you use PathwayDB in your research, please cite:
 - [mygene](https://github.com/biothings/mygene.py) - Gene annotation queries
 - [bioservices](https://github.com/cokelaer/bioservices) - Comprehensive bio web services
 - [gprofiler](https://github.com/gprofiler/gprofiler) - Functional enrichment analysis
-- [pygsva](https://github.com/guokai8/pygsva) - GSVA in Python
+- [gseapy](https://github.com/zqfang/GSEApy) - GSEA in Python
 
 ---
 
