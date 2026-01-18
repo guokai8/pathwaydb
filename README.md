@@ -106,7 +106,7 @@ go = GO(storage_path='go_human.db')
 # Download GO annotations (first time only)
 go.download_annotations(species='human')
 # Output: Downloaded 500,000+ gene-term annotations
-
+go.populate_term_names()
 # Query GO terms for a specific gene
 annotations = go.query_by_gene('BRCA1')
 print(f"BRCA1 has {len(annotations)} GO annotations")
