@@ -196,10 +196,51 @@ class KEGGAnnotationDB:
             FROM kegg_annotations
             GROUP BY pathway_id
         """
-        
+
         cursor = self.conn.execute(query)
         return {row['pathway_id']: row['genes'].split(',') for row in cursor.fetchall()}
-    
+
+    def to_dataframe(self, limit: Optional[int] = None) -> List[Dict[str, str]]:
+        """
+        Export to DataFrame-compatible format for enrichment analysis.
+
+        Returns data in format compatible with pandas DataFrame:
+        - GeneID: Gene symbol
+        - PATH: Pathway ID (e.g., 'hsa04110')
+        - Annot: Pathway name/description
+
+        Args:
+            limit: Optional limit on number of rows
+
+        Returns:
+            List of dicts with keys: GeneID, PATH, Annot
+
+        Example:
+            >>> db = KEGGAnnotationDB('kegg_human.db')
+            >>> df_data = db.to_dataframe()
+            >>> # If you have pandas installed:
+            >>> import pandas as pd
+            >>> df = pd.DataFrame(df_data)
+            >>> print(df.head())
+               GeneID    PATH                          Annot
+            0     A2M    4610  Complement and coagulation...
+            1    NAT1     232  Caffeine metabolism
+        """
+        query = """
+            SELECT
+                gene_symbol as GeneID,
+                pathway_id as PATH,
+                pathway_name as Annot
+            FROM kegg_annotations
+            ORDER BY gene_symbol, pathway_id
+        """
+
+        if limit:
+            query += f" LIMIT {limit}"
+
+        cursor = self.conn.execute(query)
+        return [dict(row) for row in cursor.fetchall()]
+
     def stats(self) -> Dict[str, int]:
         """Get database statistics."""
         cursor = self.conn.execute("""

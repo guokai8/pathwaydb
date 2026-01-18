@@ -182,10 +182,53 @@ class GOAnnotationDB:
             FROM go_annotations
             GROUP BY go_id
         """
-        
+
         cursor = self.conn.execute(query)
         return {row['go_id']: row['genes'].split(',') for row in cursor.fetchall()}
-    
+
+    def to_dataframe(self, limit: Optional[int] = None) -> List[Dict[str, str]]:
+        """
+        Export to DataFrame-compatible format for enrichment analysis.
+
+        Returns data in format compatible with pandas DataFrame:
+        - GeneID: Gene symbol
+        - TERM: GO term ID (e.g., 'GO:0006915')
+        - Aspect: Namespace (P=biological_process, F=molecular_function, C=cellular_component)
+        - Evidence: Evidence code (e.g., 'EXP', 'IDA', 'IEA')
+
+        Args:
+            limit: Optional limit on number of rows
+
+        Returns:
+            List of dicts with keys: GeneID, TERM, Aspect, Evidence
+
+        Example:
+            >>> db = GOAnnotationDB('go_human.db')
+            >>> df_data = db.to_dataframe()
+            >>> # If you have pandas installed:
+            >>> import pandas as pd
+            >>> df = pd.DataFrame(df_data)
+            >>> print(df.head())
+               GeneID        TERM Aspect Evidence
+            0     A2M  GO:0002576      P      IBA
+            1     A2M  GO:0006953      P      IEA
+        """
+        query = """
+            SELECT
+                gene_symbol as GeneID,
+                go_id as TERM,
+                aspect as Aspect,
+                evidence_code as Evidence
+            FROM go_annotations
+            ORDER BY gene_symbol, go_id
+        """
+
+        if limit:
+            query += f" LIMIT {limit}"
+
+        cursor = self.conn.execute(query)
+        return [dict(row) for row in cursor.fetchall()]
+
     def stats(self) -> Dict[str, int]:
         """Get database statistics."""
         cursor = self.conn.execute("""

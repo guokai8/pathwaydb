@@ -1,16 +1,47 @@
 # PathwayDB
 
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![GitHub](https://img.shields.io/badge/github-guokai8%2Fpathwaydb-blue.svg)](https://github.com/guokai8/pathwaydb)
+
 A lightweight Python library for querying and storing biological pathway and gene set annotations from major databases.
+
+**Perfect for:**
+- 🧬 Gene set enrichment analysis (GSEA)
+- 🔬 Pathway annotation and analysis
+- 📊 Functional genomics workflows
+- 🧪 Bioinformatics pipelines
+- 📈 Integration with pandas/R for downstream analysis
+
+## Why PathwayDB?
+
+- **No Dependencies Hassle**: Pure Python stdlib - no compilation, no conflicts, works everywhere
+- **Offline-First**: Download once, query forever - perfect for HPC clusters without internet
+- **Fast**: Millisecond queries on local SQLite databases
+- **DataFrame-Friendly**: Export directly to pandas format for analysis (like clusterProfiler in R)
+- **Simple API**: Intuitive methods that feel natural for bioinformaticians
+- **Well-Documented**: Clear examples and comprehensive documentation
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [DataFrame Export](#dataframe-export-for-enrichment-analysis)
+- [Database Information](#database-information)
+- [Advanced Usage](#advanced-usage)
+- [Documentation](#documentation)
 
 ## Features
 
-- **Multiple Database Support**: KEGG, Gene Ontology (GO), and MSigDB
-- **Zero External Dependencies**: Uses only Python standard library
-- **Local SQLite Storage**: Download once, query offline forever
-- **Smart Caching**: HTTP response caching and gene ID mapping cache
-- **Rate Limiting**: Built-in rate limiting for respectful API usage
-- **Gene ID Conversion**: Convert between Entrez, Symbol, Ensembl, and UniProt IDs
-- **DataFrame-like Interface**: Familiar query patterns for bioinformaticians
+- ✅ **Multiple Database Support**: KEGG, Gene Ontology (GO), and MSigDB
+- ✅ **Zero External Dependencies**: Uses only Python standard library
+- ✅ **Local SQLite Storage**: Download once, query offline forever
+- ✅ **DataFrame Export**: Export to pandas-compatible format (like clusterProfiler)
+- ✅ **Smart Caching**: HTTP response caching and gene ID mapping cache
+- ✅ **Rate Limiting**: Built-in rate limiting for respectful API usage
+- ✅ **Gene ID Conversion**: Convert between Entrez, Symbol, Ensembl, and UniProt IDs
+- ✅ **Fast Queries**: Millisecond-level queries on local databases
 
 ## Installation
 
@@ -38,19 +69,30 @@ from pathwaydb import KEGG
 # Initialize KEGG client with local storage
 kegg = KEGG(species='hsa', storage_path='kegg_human.db')
 
-# Download all pathway annotations (first time only)
+# Download all pathway annotations (first time only - takes ~2 minutes)
 kegg.download_annotations()
+# Output: Downloaded 8,000+ pathway-gene annotations
 
-# Query by gene
+# Query pathways for a specific gene
 results = kegg.query_by_gene('TP53')
 print(f"TP53 is in {len(results)} pathways")
+# Output: TP53 is in 73 pathways
 
-# Get pathway details
-pathway = kegg.get_pathway('hsa05200')  # Cancer pathways
-print(f"{pathway.name}: {len(pathway.genes)} genes")
+for pathway in results[:3]:
+    print(f"  {pathway.pathway_id}: {pathway.pathway_name}")
+# Output:
+#   hsa05200: Pathways in cancer
+#   hsa04115: p53 signaling pathway
+#   hsa04110: Cell cycle
 
-# Export for enrichment analysis
-gene_sets = kegg.export_gene_sets()
+# Get database statistics
+stats = kegg.stats()
+print(stats)
+# Output: {'total_annotations': 8234, 'unique_genes': 7894, 'unique_pathways': 354}
+
+# Export to DataFrame format (NEW!)
+df_data = kegg.to_dataframe()
+# Returns: [{'GeneID': 'TP53', 'PATH': 'hsa05200', 'Annot': 'Pathways in cancer'}, ...]
 ```
 
 ### Gene Ontology (GO)
@@ -59,19 +101,31 @@ gene_sets = kegg.export_gene_sets()
 from pathwaydb import GO
 
 # Initialize GO client
-go = GO(species='human', storage_path='go_human.db')
+go = GO(storage_path='go_human.db')
 
-# Download GO annotations
-go.download_annotations()
+# Download GO annotations (first time only)
+go.download_annotations(species='human')
+# Output: Downloaded 500,000+ gene-term annotations
 
-# Query by gene
+# Query GO terms for a specific gene
 annotations = go.query_by_gene('BRCA1')
-for ann in annotations:
-    print(f"{ann.gene_symbol} -> {ann.term_name} ({ann.evidence_code})")
+print(f"BRCA1 has {len(annotations)} GO annotations")
+# Output: BRCA1 has 156 GO annotations
 
-# Filter by namespace
+for ann in annotations[:3]:
+    print(f"  {ann.go_id}: {ann.aspect} [{ann.evidence_code}]")
+# Output:
+#   GO:0006281: P [IBA]  (DNA repair)
+#   GO:0006355: P [TAS]  (regulation of transcription)
+#   GO:0005515: F [IPI]  (protein binding)
+
+# Filter by namespace (biological_process, molecular_function, cellular_component)
 bp_terms = go.filter(namespace='biological_process')
-print(f"Biological Process terms: {len(bp_terms)}")
+print(f"Biological Process annotations: {len(bp_terms)}")
+
+# Export to DataFrame format
+df_data = go.to_dataframe()
+# Returns: [{'GeneID': 'BRCA1', 'TERM': 'GO:0006281', 'Aspect': 'P', 'Evidence': 'IBA'}, ...]
 ```
 
 ### MSigDB Gene Sets
@@ -198,6 +252,110 @@ for gene in genes:
     print(f"{gene}: {len(pathways)} pathways")
 ```
 
+### DataFrame Export for Enrichment Analysis
+
+**NEW FEATURE**: Export annotations in tabular format compatible with pandas DataFrame and enrichment tools (similar to clusterProfiler in R).
+
+#### Direct Export from Connectors
+
+```python
+from pathwaydb import KEGG, GO
+import pandas as pd
+
+# KEGG - Export to DataFrame format
+kegg = KEGG(species='hsa', storage_path='kegg_human.db')
+df_data = kegg.to_dataframe()  # Get all annotations
+
+# Convert to pandas DataFrame
+df = pd.DataFrame(df_data)
+print(df.head())
+```
+
+**Output:**
+```
+     GeneID      PATH                                  Annot
+0       A2M  hsa04610  Complement and coagulation cascades
+1      NAT1  hsa00232                    Caffeine metabolism
+2      NAT1  hsa00983        Drug metabolism - other enzymes
+3      NAT1  hsa01100                     Metabolic pathways
+4      NAT2  hsa00232                    Caffeine metabolism
+```
+
+#### DataFrame Format Specifications
+
+**KEGG DataFrame columns:**
+- `GeneID`: Gene symbol (e.g., 'TP53')
+- `PATH`: Pathway ID (e.g., 'hsa04110')
+- `Annot`: Pathway name/description
+
+**GO DataFrame columns:**
+- `GeneID`: Gene symbol (e.g., 'BRCA1')
+- `TERM`: GO term ID (e.g., 'GO:0006281')
+- `Aspect`: P (biological_process), F (molecular_function), C (cellular_component)
+- `Evidence`: Evidence code (e.g., 'EXP', 'IDA', 'IEA')
+
+#### Analysis Examples with pandas
+
+```python
+# Get KEGG annotations
+kegg = KEGG(species='hsa', storage_path='kegg_human.db')
+df = pd.DataFrame(kegg.to_dataframe())
+
+# Save to CSV
+df.to_csv('kegg_annotations.csv', index=False)
+
+# Filter for specific gene
+tp53_pathways = df[df['GeneID'] == 'TP53']
+print(f"TP53 pathways: {len(tp53_pathways)}")
+
+# Find all genes in cancer-related pathways
+cancer_df = df[df['Annot'].str.contains('cancer', case=False)]
+cancer_genes = cancer_df['GeneID'].unique()
+print(f"Genes in cancer pathways: {len(cancer_genes)}")
+
+# Get pathway sizes
+pathway_sizes = df.groupby('PATH')['GeneID'].count()
+print(pathway_sizes.head())
+
+# GO annotations
+go = GO(storage_path='go_human.db')
+df_go = pd.DataFrame(go.to_dataframe())
+
+# Filter biological processes only
+bp_df = df_go[df_go['Aspect'] == 'P']
+
+# Get genes with experimental evidence
+exp_df = df_go[df_go['Evidence'].isin(['EXP', 'IDA', 'IPI', 'IMP'])]
+print(f"Annotations with experimental evidence: {len(exp_df)}")
+
+# Create gene-to-term mapping
+gene_to_terms = df_go.groupby('GeneID')['TERM'].apply(list).to_dict()
+```
+
+#### Use with Enrichment Analysis Tools
+
+```python
+# Prepare background gene set
+all_genes = df['GeneID'].unique()
+
+# Prepare pathway gene sets for enrichment
+pathway_dict = df.groupby('PATH').apply(
+    lambda x: {
+        'genes': x['GeneID'].tolist(),
+        'name': x['Annot'].iloc[0]
+    }
+).to_dict()
+
+# Your gene list of interest
+my_genes = ['TP53', 'BRCA1', 'EGFR', 'MYC', 'KRAS']
+
+# Find enriched pathways (simple overlap example)
+for pathway_id, info in pathway_dict.items():
+    overlap = set(my_genes) & set(info['genes'])
+    if overlap:
+        print(f"{pathway_id}: {info['name']} - {len(overlap)} genes")
+```
+
 ## Architecture
 
 PathwayDB follows a clean 3-layer architecture:
@@ -259,6 +417,36 @@ flake8 pathwaydb/
 mypy pathwaydb/
 ```
 
+## Documentation
+
+### API Reference
+
+**Main Classes:**
+- `KEGG(species, storage_path, cache_dir)` - KEGG pathway database client
+- `GO(storage_path, cache_dir)` - Gene Ontology client
+- `MSigDB(species, storage_path, cache_dir)` - MSigDB gene sets client
+- `IDConverter(species, cache_path)` - Gene ID converter
+
+**Key Methods:**
+- `download_annotations()` - Download and store annotations
+- `query_by_gene(gene)` - Query annotations for a specific gene
+- `to_dataframe(limit)` - Export to pandas-compatible format
+- `filter(**criteria)` - Filter annotations by various criteria
+- `stats()` - Get database statistics
+- `export_gene_sets()` - Export as gene sets dictionary
+
+**Storage Classes:**
+- `KEGGAnnotationDB(db_path)` - Direct access to KEGG storage
+- `GOAnnotationDB(db_path)` - Direct access to GO storage
+
+For detailed architecture and development guidelines, see [CLAUDE.md](CLAUDE.md).
+
+### Examples
+
+See the `examples/` directory for comprehensive usage examples:
+- `examples/quickstart.py` - Basic usage for all databases
+- `examples/dataframe_export.py` - DataFrame export and analysis
+
 ## Contributing
 
 Contributions are welcome! Here are some ways to contribute:
@@ -269,7 +457,7 @@ Contributions are welcome! Here are some ways to contribute:
 4. **Report bugs**
 5. **Suggest features**
 
-See [CLAUDE.md](CLAUDE.md) for detailed development guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines and [CLAUDE.md](CLAUDE.md) for detailed development guidelines.
 
 ## License
 
@@ -303,13 +491,21 @@ If you use PathwayDB in your research, please cite:
 
 ## Roadmap
 
-- [ ] Add WikiPathways support
-- [ ] Add STRING protein interactions
-- [ ] Add DisGeNET disease associations
+**Version 0.2.0** (Planned):
+- [ ] WikiPathways connector
+- [ ] Enhanced DataFrame export with metadata
 - [ ] Batch download utilities
-- [ ] Web interface for queries
-- [ ] Integration with popular enrichment tools (GSEA, enrichR)
+- [ ] Comprehensive test suite
+
+**Future Considerations** (based on user feedback):
+- [ ] STRING protein-protein interactions
+- [ ] DisGeNET disease-gene associations
+- [ ] Human Phenotype Ontology (HPO)
+- [ ] Integration helpers for GSEA/enrichR
 - [ ] REST API server mode
+- [ ] Command-line interface (CLI)
+
+**Want to contribute?** See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add new database connectors!
 
 ## Related Projects
 

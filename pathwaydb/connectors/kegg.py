@@ -186,6 +186,27 @@ class KEGG:
         
         return self.storage
     
+    def query_by_gene(self, gene: str, id_type: str = 'symbol'):
+        """
+        Query pathways for a specific gene.
+
+        Args:
+            gene: Gene identifier (symbol or ID)
+            id_type: 'symbol' or 'id' (default: 'symbol')
+
+        Returns:
+            List of pathway annotation records
+
+        Example:
+            >>> kegg = KEGG(species='hsa', storage_path='kegg_human.db')
+            >>> results = kegg.query_by_gene('TP53')
+            >>> print(f"TP53 is in {len(results)} pathways")
+        """
+        if not self.storage:
+            raise ValueError("No storage configured. Set storage_path in __init__")
+
+        return self.storage.query_by_gene([gene], id_type=id_type)
+
     def query_annotations(
         self,
         gene_symbols: Optional[List[str]] = None,
@@ -195,13 +216,41 @@ class KEGG:
         """Query stored annotations."""
         if not self.storage:
             raise ValueError("No storage configured. Set storage_path in __init__")
-        
+
         return self.storage.filter(
             gene_symbols=gene_symbols,
             gene_ids=gene_ids,
             pathway_ids=pathway_ids
         )
-    
+
+    def to_dataframe(self, limit: Optional[int] = None):
+        """
+        Export annotations to DataFrame-compatible format.
+
+        Args:
+            limit: Optional limit on number of rows
+
+        Returns:
+            List of dicts with keys: GeneID, PATH, Annot
+
+        Example:
+            >>> kegg = KEGG(species='hsa', storage_path='kegg_human.db')
+            >>> df_data = kegg.to_dataframe()
+            >>> import pandas as pd
+            >>> df = pd.DataFrame(df_data)
+        """
+        if not self.storage:
+            raise ValueError("No storage configured. Set storage_path in __init__")
+
+        return self.storage.to_dataframe(limit=limit)
+
+    def stats(self):
+        """Get database statistics."""
+        if not self.storage:
+            raise ValueError("No storage configured. Set storage_path in __init__")
+
+        return self.storage.stats()
+
     def export_gene_sets(self) -> Dict[str, List[str]]:
         """Export stored annotations as gene sets for enrichment analysis."""
         if not self.storage:

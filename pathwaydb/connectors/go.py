@@ -50,6 +50,27 @@ class GO:
         
         return self.storage
     
+    def query_by_gene(self, gene: str, id_type: str = 'symbol'):
+        """
+        Query GO terms for a specific gene.
+
+        Args:
+            gene: Gene identifier (symbol or ID)
+            id_type: 'symbol' or 'id' (default: 'symbol')
+
+        Returns:
+            List of GO annotation records
+
+        Example:
+            >>> go = GO(species='human', storage_path='go_human.db')
+            >>> results = go.query_by_gene('BRCA1')
+            >>> print(f"BRCA1 has {len(results)} GO annotations")
+        """
+        if not self.storage:
+            raise ValueError("No storage configured. Set storage_path in __init__")
+
+        return self.storage.query_by_gene([gene], id_type=id_type)
+
     def query_annotations(
         self,
         gene_symbols: Optional[List[str]] = None,
@@ -60,14 +81,74 @@ class GO:
         """Query stored annotations."""
         if not self.storage:
             raise ValueError("No storage configured")
-        
+
         return self.storage.filter(
             gene_symbols=gene_symbols,
             go_ids=go_ids,
             evidence_codes=evidence_codes,
             aspect=aspect
         )
-    
+
+    def filter(
+        self,
+        gene_symbols: Optional[List[str]] = None,
+        go_ids: Optional[List[str]] = None,
+        evidence_codes: Optional[List[str]] = None,
+        aspect: Optional[str] = None,
+        namespace: Optional[str] = None
+    ):
+        """
+        Filter GO annotations by various criteria.
+
+        Note: 'namespace' is an alias for 'aspect' for user convenience.
+        """
+        if not self.storage:
+            raise ValueError("No storage configured")
+
+        # Map namespace to aspect if provided
+        if namespace:
+            aspect_map = {
+                'biological_process': 'P',
+                'molecular_function': 'F',
+                'cellular_component': 'C'
+            }
+            aspect = aspect_map.get(namespace, namespace)
+
+        return self.storage.filter(
+            gene_symbols=gene_symbols,
+            go_ids=go_ids,
+            evidence_codes=evidence_codes,
+            aspect=aspect
+        )
+
+    def to_dataframe(self, limit: Optional[int] = None):
+        """
+        Export annotations to DataFrame-compatible format.
+
+        Args:
+            limit: Optional limit on number of rows
+
+        Returns:
+            List of dicts with keys: GeneID, TERM, Aspect, Evidence
+
+        Example:
+            >>> go = GO(species='human', storage_path='go_human.db')
+            >>> df_data = go.to_dataframe()
+            >>> import pandas as pd
+            >>> df = pd.DataFrame(df_data)
+        """
+        if not self.storage:
+            raise ValueError("No storage configured. Set storage_path in __init__")
+
+        return self.storage.to_dataframe(limit=limit)
+
+    def stats(self):
+        """Get database statistics."""
+        if not self.storage:
+            raise ValueError("No storage configured. Set storage_path in __init__")
+
+        return self.storage.stats()
+
     def export_gene_sets(self) -> Dict[str, List[str]]:
         """Export as gene sets."""
         if not self.storage:
