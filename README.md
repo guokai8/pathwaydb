@@ -72,7 +72,7 @@ kegg = KEGG(species='hsa', storage_path='kegg_human.db')
 # Download all pathway annotations (first time only - takes ~2 minutes)
 kegg.download_annotations()
 # Output: Downloaded 8,000+ pathway-gene annotations
-
+kegg.convert_ids_to_symbols()
 # Query pathways for a specific gene
 results = kegg.query_by_gene('TP53')
 print(f"TP53 is in {len(results)} pathways")
