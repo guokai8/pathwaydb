@@ -207,13 +207,57 @@ class KEGG:
 
         return self.storage.query_by_gene([gene], id_type=id_type)
 
+    def filter(
+        self,
+        gene_symbols: Optional[List[str]] = None,
+        gene_ids: Optional[List[str]] = None,
+        pathway_ids: Optional[List[str]] = None,
+        pathway_name: Optional[str] = None,
+        organism: Optional[str] = None
+    ):
+        """
+        Filter annotations by multiple criteria.
+
+        Args:
+            gene_symbols: Filter by gene symbols (e.g., ['TP53', 'BRCA1'])
+            gene_ids: Filter by gene IDs (e.g., ['hsa:7157'])
+            pathway_ids: Filter by pathway IDs (e.g., ['hsa04110'])
+            pathway_name: Filter by pathway name (case-insensitive substring match)
+            organism: Filter by organism code (e.g., 'hsa')
+
+        Returns:
+            List of KEGGAnnotationRecord objects
+
+        Example:
+            >>> kegg = KEGG(species='hsa', storage_path='kegg_human.db')
+            >>> # Filter by pathway name
+            >>> cancer_pathways = kegg.filter(pathway_name='cancer')
+            >>> # Combine filters
+            >>> tp53_cancer = kegg.filter(gene_symbols=['TP53'], pathway_name='cancer')
+        """
+        if not self.storage:
+            raise ValueError("No storage configured. Set storage_path in __init__")
+
+        return self.storage.filter(
+            gene_symbols=gene_symbols,
+            gene_ids=gene_ids,
+            pathway_ids=pathway_ids,
+            pathway_name=pathway_name,
+            organism=organism
+        )
+
     def query_annotations(
         self,
         gene_symbols: Optional[List[str]] = None,
         gene_ids: Optional[List[str]] = None,
         pathway_ids: Optional[List[str]] = None
     ):
-        """Query stored annotations."""
+        """
+        Query stored annotations (legacy method - use filter() instead).
+
+        This method is kept for backwards compatibility.
+        Use filter() for more options including pathway_name filtering.
+        """
         if not self.storage:
             raise ValueError("No storage configured. Set storage_path in __init__")
 

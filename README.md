@@ -110,8 +110,7 @@ kegg = KEGG(species='hsa', storage_path='kegg_human.db')
 # Download all pathway annotations (first time only - takes ~2 minutes)
 kegg.download_annotations()
 # Output: Downloaded 8,000+ pathway-gene annotations
-# convert id if you need the gene symbol
-kegg.convert_ids_to_symbols()
+
 # Query pathways for a specific gene
 results = kegg.query_by_gene('TP53')
 print(f"TP53 is in {len(results)} pathways")
@@ -326,12 +325,34 @@ print(f"Unique pathways: {stats['unique_pathways']}")
 print(f"Unique genes: {stats['unique_genes']}")
 ```
 
-### Custom Caching
+### Centralized GO Caching (NEW in v0.2.0)
+
+Download GO annotations once and reuse across all your projects:
+
+```python
+from pathwaydb import GO
+
+# Option 1: Load from cache (auto-downloads if missing)
+go = GO.from_cache(species='human')  # Uses ~/.pathwaydb_cache/go_annotations/
+
+# Option 2: Smart load - auto-detects best source
+# Tries: bundled package data > cache > download
+go = GO.load(species='human')
+
+# Option 3: Manually download to cache first
+from pathwaydb.storage.go_db import download_to_cache
+download_to_cache(species='human')  # Download once
+go = GO.from_cache(species='human')  # Reuse in any project
+```
+
+See [GO_CACHE_GUIDE.md](GO_CACHE_GUIDE.md) for complete caching documentation.
+
+### Custom HTTP Caching
 
 ```python
 from pathwaydb import KEGG
 
-# Use custom cache directory
+# Use custom HTTP cache directory
 kegg = KEGG(
     species='hsa',
     cache_dir='/path/to/custom/cache',
@@ -399,6 +420,12 @@ print(df.head())
 - `Aspect`: P (biological_process), F (molecular_function), C (cellular_component)
 - `Evidence`: Evidence code (e.g., 'EXP', 'IDA', 'IEA')
 
+**MSigDB DataFrame columns:**
+- `GeneID`: Gene symbol (e.g., 'TP53')
+- `GeneSet`: Gene set name (e.g., 'HALLMARK_APOPTOSIS')
+- `Collection`: Collection code (e.g., 'H', 'C2')
+- `Description`: Gene set description
+
 #### Analysis Examples with pandas
 
 ```python
@@ -435,6 +462,18 @@ print(f"Annotations with experimental evidence: {len(exp_df)}")
 
 # Create gene-to-term mapping
 gene_to_terms = df_go.groupby('GeneID')['TERM'].apply(list).to_dict()
+
+# MSigDB gene sets
+msigdb = MSigDB(storage_path='msigdb.db')
+df_msigdb = pd.DataFrame(msigdb.to_dataframe(collection='H'))
+
+# Find genes in specific gene sets
+apoptosis_genes = df_msigdb[df_msigdb['GeneSet'].str.contains('APOPTOSIS', case=False)]
+print(f"Genes in apoptosis gene sets: {len(apoptosis_genes)}")
+
+# Get all gene sets for a specific gene
+tp53_sets = df_msigdb[df_msigdb['GeneID'] == 'TP53']['GeneSet'].unique()
+print(f"TP53 is in {len(tp53_sets)} gene sets")
 ```
 
 #### Use with Enrichment Analysis Tools
