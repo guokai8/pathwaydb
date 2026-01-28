@@ -107,9 +107,12 @@ from pathwaydb import KEGG
 # Initialize KEGG client with local storage
 kegg = KEGG(species='hsa', storage_path='kegg_human.db')
 
-# Download all pathway annotations (first time only - takes ~2 minutes)
+# Download all pathway annotations (first time only)
+# Automatically includes pathway hierarchy (Level1, Level2, Level3)!
 kegg.download_annotations()
 # Output: Downloaded 8,000+ pathway-gene annotations
+#         Downloading KEGG pathway hierarchy...
+#         ✓ Updated 354 pathways with hierarchy information
 kegg.convert_ids_to_symbols()
 
 # Query pathways for a specific gene
@@ -124,7 +127,7 @@ for pathway in results[:3]:
 #   hsa04115: p53 signaling pathway
 #   hsa04110: Cell cycle
 
-# NEW: Filter by pathway name (case-insensitive substring match)
+# Filter by pathway name (case-insensitive substring match)
 cancer_pathways = kegg.filter(pathway_name='cancer')
 print(f"Found {len(cancer_pathways)} cancer-related annotations")
 # Output: Found 2,389 cancer-related annotations
@@ -139,9 +142,32 @@ stats = kegg.stats()
 print(stats)
 # Output: {'total_annotations': 8234, 'unique_genes': 7894, 'unique_pathways': 354}
 
-# Export to DataFrame format
+# Export to DataFrame format (includes hierarchy!)
 df_data = kegg.to_dataframe()
-# Returns: [{'GeneID': 'TP53', 'PATH': 'hsa05200', 'Annot': 'Pathways in cancer'}, ...]
+# Returns: [{'GeneID': 'TP53', 'PATH': 'hsa05200', 'Annot': 'Pathways in cancer',
+#            'Level1': 'Human Diseases', 'Level2': 'Cancer: overview', 'Level3': 'Pathways in cancer'}, ...]
+```
+
+#### KEGG Pathway Hierarchy
+
+Pathway annotations include hierarchical classification from KEGG BRITE:
+
+| Level | Description | Example |
+|-------|-------------|---------|
+| **Level1** | Top-level category | Metabolism, Human Diseases, Cellular Processes |
+| **Level2** | Sub-category | Carbohydrate metabolism, Cancer, Cell growth |
+| **Level3** | Pathway name | Glycolysis, Pathways in cancer, Cell cycle |
+
+```python
+# Access hierarchy in DataFrame export
+import pandas as pd
+df = pd.DataFrame(kegg.to_dataframe())
+print(df[['GeneID', 'PATH', 'Level1', 'Level2']].head())
+#    GeneID       PATH           Level1                  Level2
+# 0    TP53  hsa05200  Human Diseases         Cancer: overview
+# 1    TP53  hsa04115  Human Diseases  Cancer: specific types
+# 2    TP53  hsa04110  Cellular Processes    Cell growth and death
+```
 ```
 
 ### Gene Ontology (GO)

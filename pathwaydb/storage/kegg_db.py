@@ -14,7 +14,10 @@ class KEGGAnnotationRecord:
     pathway_id: str
     pathway_name: Optional[str] = None
     organism: Optional[str] = None
-    
+    level1: Optional[str] = None  # Top-level category (e.g., "Metabolism")
+    level2: Optional[str] = None  # Sub-category (e.g., "Carbohydrate metabolism")
+    level3: Optional[str] = None  # Pathway name (same as pathway_name)
+
     def to_dict(self) -> Dict[str, str]:
         """Convert to dictionary."""
         return asdict(self)
@@ -56,14 +59,27 @@ class KEGGAnnotationDB:
                 pathway_id TEXT NOT NULL,
                 pathway_name TEXT,
                 organism TEXT,
+                level1 TEXT,
+                level2 TEXT,
+                level3 TEXT,
                 PRIMARY KEY (gene_id, pathway_id)
             );
-            
+
             CREATE INDEX IF NOT EXISTS idx_kegg_gene_id ON kegg_annotations(gene_id);
             CREATE INDEX IF NOT EXISTS idx_kegg_gene_symbol ON kegg_annotations(gene_symbol);
             CREATE INDEX IF NOT EXISTS idx_kegg_pathway_id ON kegg_annotations(pathway_id);
             CREATE INDEX IF NOT EXISTS idx_kegg_organism ON kegg_annotations(organism);
-            
+            CREATE INDEX IF NOT EXISTS idx_kegg_level1 ON kegg_annotations(level1);
+            CREATE INDEX IF NOT EXISTS idx_kegg_level2 ON kegg_annotations(level2);
+
+            CREATE TABLE IF NOT EXISTS pathway_hierarchy (
+                pathway_id TEXT PRIMARY KEY,
+                pathway_name TEXT,
+                level1 TEXT,
+                level2 TEXT,
+                level3 TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS metadata (
                 key TEXT PRIMARY KEY,
                 value TEXT
@@ -76,15 +92,18 @@ class KEGGAnnotationDB:
         cursor = self.conn.cursor()
         for record in records:
             cursor.execute("""
-                INSERT OR REPLACE INTO kegg_annotations 
-                (gene_id, gene_symbol, pathway_id, pathway_name, organism)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO kegg_annotations
+                (gene_id, gene_symbol, pathway_id, pathway_name, organism, level1, level2, level3)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 record.gene_id,
                 record.gene_symbol,
                 record.pathway_id,
                 record.pathway_name,
-                record.organism
+                record.organism,
+                record.level1,
+                record.level2,
+                record.level3
             ))
         self.conn.commit()
     
@@ -232,29 +251,33 @@ class KEGGAnnotationDB:
         - GeneID: Gene symbol
         - PATH: Pathway ID (e.g., 'hsa04110')
         - Annot: Pathway name/description
+        - Level1: Top-level category (e.g., 'Metabolism')
+        - Level2: Sub-category (e.g., 'Carbohydrate metabolism')
+        - Level3: Pathway name (same as Annot)
 
         Args:
             limit: Optional limit on number of rows
 
         Returns:
-            List of dicts with keys: GeneID, PATH, Annot
+            List of dicts with keys: GeneID, PATH, Annot, Level1, Level2, Level3
 
         Example:
             >>> db = KEGGAnnotationDB('kegg_human.db')
             >>> df_data = db.to_dataframe()
-            >>> # If you have pandas installed:
             >>> import pandas as pd
             >>> df = pd.DataFrame(df_data)
             >>> print(df.head())
-               GeneID    PATH                          Annot
-            0     A2M    4610  Complement and coagulation...
-            1    NAT1     232  Caffeine metabolism
+               GeneID    PATH                          Annot            Level1
+            0     A2M  hsa4610  Complement and coagulation...  Organismal Systems
         """
         query = """
             SELECT
                 gene_symbol as GeneID,
                 pathway_id as PATH,
-                pathway_name as Annot
+                pathway_name as Annot,
+                level1 as Level1,
+                level2 as Level2,
+                level3 as Level3
             FROM kegg_annotations
             ORDER BY gene_symbol, pathway_id
         """
@@ -295,13 +318,109 @@ class KEGGAnnotationDB:
         row = cursor.fetchone()
         return row['value'] if row else None
     
+    def populate_pathway_hierarchy(self):
+        """
+        Populate KEGG pathway hierarchy (Level1, Level2, Level3) from KEGG BRITE.
+
+        Downloads the KEGG pathway classification hierarchy and updates
+        all annotations with their category information.
+
+        Level1: Top-level category (e.g., "Metabolism", "Human Diseases")
+        Level2: Sub-category (e.g., "Carbohydrate metabolism", "Cancer")
+        Level3: Pathway name (same as pathway_name)
+
+        Example:
+            >>> db = KEGGAnnotationDB('kegg_human.db')
+            >>> db.populate_pathway_hierarchy()
+            >>> # Now annotations include Level1, Level2, Level3 columns
+        """
+        print("Downloading KEGG pathway hierarchy...")
+
+        # Download KEGG BRITE hierarchy for pathways
+        url = "https://rest.kegg.jp/get/br:br08901"
+        request = Request(url, headers={'User-Agent': 'pathwaydb/0.2.0 (Python)'})
+
+        try:
+            with urlopen(request, timeout=60) as response:
+                content = response.read().decode('utf-8')
+        except Exception as e:
+            print(f"Warning: Could not download pathway hierarchy: {e}")
+            return
+
+        # Parse the BRITE hierarchy format
+        hierarchy = {}  # pathway_number -> (level1, level2, pathway_name)
+        current_level1 = None
+        current_level2 = None
+
+        for line in content.split('\n'):
+            if not line or line.startswith('#') or line.startswith('!'):
+                continue
+
+            # Count leading spaces to determine level
+            stripped = line.lstrip()
+            indent = len(line) - len(stripped)
+
+            if indent == 0 and stripped.startswith('A'):
+                # Level 1: Top category (e.g., "A Metabolism")
+                current_level1 = stripped[1:].strip().lstrip('<b>').rstrip('</b>').strip()
+            elif indent == 1 or (indent == 0 and stripped.startswith('B')):
+                # Level 2: Sub-category (e.g., "B  Carbohydrate metabolism")
+                if stripped.startswith('B'):
+                    current_level2 = stripped[1:].strip()
+                else:
+                    current_level2 = stripped.strip()
+            elif indent >= 2 or stripped.startswith('C'):
+                # Level 3: Pathway (e.g., "C    00010 Glycolysis")
+                if stripped.startswith('C'):
+                    stripped = stripped[1:].strip()
+                parts = stripped.split(None, 1)
+                if len(parts) >= 2 and parts[0].isdigit():
+                    pathway_num = parts[0]  # e.g., "00010"
+                    pathway_name = parts[1].split('[')[0].strip()  # Remove [PATH:xxx]
+                    hierarchy[pathway_num] = (current_level1, current_level2, pathway_name)
+
+        print(f"  Parsed {len(hierarchy)} pathway categories")
+
+        # Update annotations with hierarchy
+        # Get all unique pathway IDs from the database
+        cursor = self.conn.execute("SELECT DISTINCT pathway_id FROM kegg_annotations")
+        pathway_ids = [row[0] for row in cursor.fetchall()]
+
+        updated = 0
+        for pathway_id in pathway_ids:
+            # Extract pathway number (e.g., "hsa00010" -> "00010")
+            pathway_num = pathway_id.replace('path:', '')
+            # Remove organism prefix (e.g., "hsa00010" -> "00010")
+            if len(pathway_num) > 5:
+                pathway_num = pathway_num[-5:]  # Last 5 digits
+
+            if pathway_num in hierarchy:
+                level1, level2, level3 = hierarchy[pathway_num]
+                self.conn.execute("""
+                    UPDATE kegg_annotations
+                    SET level1 = ?, level2 = ?, level3 = ?
+                    WHERE pathway_id = ?
+                """, (level1, level2, level3, pathway_id))
+                updated += 1
+
+        # Also store in pathway_hierarchy table for reference
+        for pathway_num, (level1, level2, level3) in hierarchy.items():
+            self.conn.execute("""
+                INSERT OR REPLACE INTO pathway_hierarchy
+                (pathway_id, pathway_name, level1, level2, level3)
+                VALUES (?, ?, ?, ?, ?)
+            """, (pathway_num, level3, level1, level2, level3))
+
+        self.conn.commit()
+        print(f"✓ Updated {updated} pathways with hierarchy information")
+
     def close(self):
         """Close database connection."""
         self.conn.close()
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 

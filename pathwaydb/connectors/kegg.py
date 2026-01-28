@@ -132,12 +132,15 @@ class KEGG:
             ))
         
         print(f"✓ Downloaded {len(annotations)} pathway-gene annotations")
-        
+
         # Store in database
         self.storage.insert_batch(annotations)
         self.storage.set_metadata('kegg_organism', org)
         print(f"✓ Stored annotations in {self.storage.db_path}")
-        
+
+        # Populate pathway hierarchy (Level1, Level2, Level3)
+        self.storage.populate_pathway_hierarchy()
+
         return self.storage
     
     def convert_ids_to_symbols(self):
