@@ -2,11 +2,7 @@
 import gzip
 import sqlite3
 from typing import List, Optional, Dict, Union
-<<<<<<< HEAD
-from urllib.request import urlopen
-=======
 from urllib.request import urlopen, Request
->>>>>>> 0ad8423 (revise function)
 from dataclasses import dataclass, asdict
 
 
@@ -263,18 +259,6 @@ class GOAnnotationDB:
 
         return dict(cursor.fetchone())
 
-<<<<<<< HEAD
-    def populate_term_names(self, use_bundled_data: bool = True):
-        """
-        Populate GO term names in the database.
-
-        This method tries to use bundled term name data from the package first,
-        then falls back to QuickGO API if needed.
-
-        Args:
-            use_bundled_data: If True, use bundled package data (default: True)
-                             Set to False to force QuickGO API calls
-=======
     def populate_term_names(self, source: str = 'auto'):
         """
         Populate GO term names in the database.
@@ -290,7 +274,6 @@ class GOAnnotationDB:
             >>> db = GOAnnotationDB('go_human.db')
             >>> db.populate_term_names()  # Auto-detect best source
             >>> db.populate_term_names(source='obo')  # Force OBO file
->>>>>>> 0ad8423 (revise function)
         """
         import json
         import time
@@ -305,17 +288,11 @@ class GOAnnotationDB:
 
         print(f"Populating names for {len(go_ids)} GO terms...")
 
-<<<<<<< HEAD
-        # Try bundled data first
-        total_updated = 0
-        if use_bundled_data:
-=======
         total_updated = 0
         remaining_ids = go_ids
 
         # Step 1: Try bundled data first (if auto or bundled)
         if source in ('auto', 'bundled'):
->>>>>>> 0ad8423 (revise function)
             try:
                 from ..data import load_go_term_names, has_go_term_names
 
@@ -323,12 +300,7 @@ class GOAnnotationDB:
                     print("  Using bundled term name data (instant!)...")
                     term_names = load_go_term_names()
 
-<<<<<<< HEAD
-                    # Update all terms from bundled data
-                    for go_id in go_ids:
-=======
                     for go_id in remaining_ids:
->>>>>>> 0ad8423 (revise function)
                         term_name = term_names.get(go_id)
                         if term_name:
                             self.conn.execute(
@@ -340,37 +312,6 @@ class GOAnnotationDB:
                     self.conn.commit()
                     print(f"  ✓ Updated {total_updated}/{len(go_ids)} terms from bundled data")
 
-<<<<<<< HEAD
-                    # Check if we got all terms
-                    cursor = self.conn.execute("SELECT DISTINCT go_id FROM go_annotations WHERE term_name IS NULL")
-                    remaining = [row[0] for row in cursor.fetchall()]
-
-                    if not remaining:
-                        print(f"✓ All GO term names populated successfully!")
-                        return
-                    else:
-                        print(f"  Note: {len(remaining)} terms not found in bundled data")
-                        go_ids = remaining  # Continue with QuickGO API for remaining
-
-                else:
-                    print("  Note: Bundled term name data not found, using QuickGO API...")
-
-            except Exception as e:
-                print(f"  Warning: Could not use bundled data: {e}")
-                print("  Falling back to QuickGO API...")
-
-        # Fetch remaining terms from QuickGO API
-        if go_ids:
-            print(f"  Fetching {len(go_ids)} terms from QuickGO API...")
-            base_url = "https://www.ebi.ac.uk/QuickGO/services/ontology/go/terms"
-
-            # Process in batches of 100
-            batch_size = 100
-            api_updated = 0
-
-            for i in range(0, len(go_ids), batch_size):
-                batch = go_ids[i:i+batch_size]
-=======
                     # Check remaining
                     cursor = self.conn.execute("SELECT DISTINCT go_id FROM go_annotations WHERE term_name IS NULL")
                     remaining_ids = [row[0] for row in cursor.fetchall()]
@@ -442,17 +383,12 @@ class GOAnnotationDB:
 
             for i in range(0, len(remaining_ids), batch_size):
                 batch = remaining_ids[i:i+batch_size]
->>>>>>> 0ad8423 (revise function)
                 ids_param = ",".join(batch)
 
                 try:
                     url = f"{base_url}/{ids_param}"
-<<<<<<< HEAD
-                    with urlopen(url, timeout=30) as response:
-=======
                     request = Request(url, headers={'User-Agent': 'pathwaydb/0.2.0 (Python)'})
                     with urlopen(request, timeout=30) as response:
->>>>>>> 0ad8423 (revise function)
                         data = json.loads(response.read().decode('utf-8'))
 
                         if 'results' in data:
@@ -468,22 +404,12 @@ class GOAnnotationDB:
                                     api_updated += 1
 
                     self.conn.commit()
-<<<<<<< HEAD
-                    print(f"    Processed {min(i+batch_size, len(go_ids))}/{len(go_ids)} terms from API...")
-
-                    # Rate limiting
-                    time.sleep(0.2)
-
-                except Exception as e:
-                    print(f"    Warning: Failed to fetch batch {i//batch_size + 1}: {e}")
-=======
                     print(f"    Processed {min(i+batch_size, len(remaining_ids))}/{len(remaining_ids)} terms...")
 
                     time.sleep(0.2)  # Rate limiting
 
                 except Exception as e:
                     print(f"    Warning: Failed to fetch batch: {e}")
->>>>>>> 0ad8423 (revise function)
                     continue
 
             total_updated += api_updated
@@ -502,17 +428,54 @@ class GOAnnotationDB:
         self.close()
 
 
+# Mapping of species names to GO annotation file names and taxonomy IDs
+# Files are downloaded from http://geneontology.org/gene-associations/
+GO_SPECIES_MAP = {
+    # Mammals
+    'human': {'file': 'goa_human', 'taxid': '9606'},
+    'mouse': {'file': 'mgi', 'taxid': '10090'},
+    'rat': {'file': 'rgd', 'taxid': '10116'},
+    'pig': {'file': 'goa_pig', 'taxid': '9823'},
+    'cow': {'file': 'goa_cow', 'taxid': '9913'},
+    'dog': {'file': 'goa_dog', 'taxid': '9615'},
+    'chicken': {'file': 'goa_chicken', 'taxid': '9031'},
+    # Fish
+    'zebrafish': {'file': 'zfin', 'taxid': '7955'},
+    # Invertebrates
+    'fly': {'file': 'fb', 'taxid': '7227'},
+    'worm': {'file': 'wb', 'taxid': '6239'},
+    # Plants
+    'arabidopsis': {'file': 'tair', 'taxid': '3702'},
+    # Fungi
+    'yeast': {'file': 'sgd', 'taxid': '559292'},
+}
+
+
+def get_supported_species() -> list:
+    """Return list of supported species for GO annotations."""
+    return sorted(GO_SPECIES_MAP.keys())
+
+
 def download_go_annotations_filtered(
     species: str = 'human',
     evidence_codes: Optional[List[str]] = None,
     output_path: str = 'go_annotations.db',
     return_db: bool = True
 ) -> Optional[GOAnnotationDB]:
-    """Download GO annotations with filtering."""
-    TAXID_MAP = {'human': '9606', 'mouse': '10090', 'rat': '10116'}
-    taxid = TAXID_MAP.get(species, '9606')
-    
-    url = f"http://geneontology.org/gene-associations/goa_{species}.gaf.gz"
+    """Download GO annotations with filtering.
+
+    Supported species: human, mouse, rat, pig, cow, dog, chicken,
+                       zebrafish, fly, worm, arabidopsis, yeast
+    """
+    if species not in GO_SPECIES_MAP:
+        supported = ', '.join(get_supported_species())
+        raise ValueError(f"Unsupported species: {species}. Supported: {supported}")
+
+    species_info = GO_SPECIES_MAP[species]
+    file_name = species_info['file']
+    taxid = species_info['taxid']
+
+    url = f"http://geneontology.org/gene-associations/{file_name}.gaf.gz"
     valid_evidence = set(evidence_codes) if evidence_codes else None
     
     db = sqlite3.connect(output_path)
@@ -544,17 +507,11 @@ def download_go_annotations_filtered(
     
     print(f"Downloading GO annotations from {url}...")
     count = 0
-<<<<<<< HEAD
-    
-    try:
-        with urlopen(url, timeout=300) as response:
-=======
 
     try:
         # Add User-Agent header to avoid 403 Forbidden errors
         request = Request(url, headers={'User-Agent': 'pathwaydb/0.2.0 (Python)'})
         with urlopen(request, timeout=300) as response:
->>>>>>> 0ad8423 (revise function)
             with gzip.open(response, 'rt') as f:
                 for line in f:
                     if line.startswith('!'):
@@ -599,8 +556,6 @@ def load_go_annotations(db_path: str) -> GOAnnotationDB:
     return GOAnnotationDB(db_path)
 
 
-<<<<<<< HEAD
-=======
 def download_go_obo(cache_dir: Optional[str] = None) -> Dict[str, str]:
     """
     Download and parse GO OBO file to get all GO term names.
@@ -683,7 +638,6 @@ def download_go_obo(cache_dir: Optional[str] = None) -> Dict[str, str]:
     return term_names
 
 
->>>>>>> 0ad8423 (revise function)
 def get_cache_path(species: str = 'human') -> str:
     """Get the default cache path for GO annotations."""
     from pathlib import Path
@@ -706,7 +660,7 @@ def download_to_cache(
     Args:
         species: Species name ('human', 'mouse', 'rat')
         evidence_codes: Optional list of evidence codes to filter by
-        fetch_term_names: If True, fetch term names from QuickGO API (default: True)
+        fetch_term_names: If True, populate term names from bundled package data (default: True)
         force_refresh: If True, re-download even if cache exists
 
     Returns:
@@ -752,15 +706,12 @@ def download_to_cache(
         return_db=False
     )
 
-    # Fetch term names if requested
+    # Populate term names from bundled data (instant!)
     if fetch_term_names:
-        print("\nFetching GO term names from QuickGO API...")
-        print("(This takes a few minutes but only needs to be done once)")
-
-        from ..connectors.go import GO
-        go = GO(storage_path=cache_path)
-        go.populate_term_names()
-        print("✓ Term names populated in cache!")
+        print("\nPopulating GO term names from bundled package data...")
+        db = GOAnnotationDB(cache_path)
+        db.populate_term_names(source='bundled')
+        db.close()
 
     print(f"\n✓ GO annotations cached successfully at: {cache_path}")
     return cache_path

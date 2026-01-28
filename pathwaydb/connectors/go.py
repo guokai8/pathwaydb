@@ -5,11 +5,25 @@ from ..core.models import Term
 from ..core.constants import GO_API_URL, GO_QUICKGO_URL, DEFAULT_RATE_LIMIT
 from ..core.exceptions import NotFoundError
 from ..http.client import HTTPClient
-from ..storage.go_db import GOAnnotationDB, download_go_annotations_filtered
+from ..storage.go_db import GOAnnotationDB, download_go_annotations_filtered, get_supported_species
 
 
 class GO:
-    """Gene Ontology client with dedicated storage."""
+    """
+    Gene Ontology client with dedicated storage.
+
+    Supported species:
+        - Mammals: human, mouse, rat, pig, cow, dog, chicken
+        - Fish: zebrafish
+        - Invertebrates: fly, worm
+        - Plants: arabidopsis
+        - Fungi: yeast
+
+    Example:
+        >>> go = GO(storage_path='go_human.db')
+        >>> go.download_annotations(species='human')
+        >>> results = go.filter(gene_symbols=['TP53'])
+    """
 
     def __init__(
         self,
@@ -156,9 +170,9 @@ class GO:
         Args:
             species: Species name ('human', 'mouse', etc.)
             evidence_codes: Optional list of evidence codes to filter by
-            fetch_term_names: If True, automatically fetch term names from QuickGO API
-                             (default: True). Set to False to skip this step and
-                             fetch term names later with populate_term_names()
+            fetch_term_names: If True, automatically populate term names from bundled
+                             package data (default: True). This is instant since term
+                             names are stored locally in the package.
 
         Returns:
             GOAnnotationDB instance
@@ -181,12 +195,10 @@ class GO:
             return_db=False
         )
 
-        # Automatically fetch term names unless user opts out
+        # Automatically populate term names from bundled data (instant!)
         if fetch_term_names:
-            print("\nFetching GO term names from QuickGO API...")
-            print("(This takes a few minutes but only needs to be done once)")
-            self.populate_term_names()
-            print("✓ Term names populated successfully!")
+            print("\nPopulating GO term names from bundled package data...")
+            self.populate_term_names(source='bundled')
 
         return self.storage
     
@@ -299,24 +311,28 @@ class GO:
 
         return self.storage.to_dataframe(limit=limit)
 
-    def populate_term_names(self):
+    def populate_term_names(self, source: str = 'bundled'):
         """
-        Fetch and populate GO term names from QuickGO API.
+        Populate GO term names in the database.
 
-        This method downloads term names for all unique GO IDs in the database.
-        Term names enable filtering by description instead of just GO IDs.
+        Args:
+            source: Source for term names. Options:
+                - 'bundled': Use bundled package data only (default, instant!)
+                - 'auto': Try bundled data first, then OBO file, then QuickGO API
+                - 'obo': Download and parse GO OBO file (~35MB download)
+                - 'quickgo': Use QuickGO API only (slow, may have rate limits)
 
         Example:
             >>> go = GO(storage_path='go_human.db')
-            >>> go.download_annotations(species='human')
-            >>> go.populate_term_names()  # Fetch term names
-            >>> # Now you can filter by term name
-            >>> dna_repair = go.filter(term_name='DNA repair')
+            >>> go.download_annotations(species='human', fetch_term_names=False)
+            >>> go.populate_term_names()  # Uses bundled data (instant!)
+            >>> # Or fetch from OBO file for latest names
+            >>> go.populate_term_names(source='obo')
         """
         if not self.storage:
             raise ValueError("No storage configured. Set storage_path in __init__")
 
-        return self.storage.populate_term_names()
+        return self.storage.populate_term_names(source=source)
 
     def stats(self):
         """Get database statistics."""

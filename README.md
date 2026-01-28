@@ -110,11 +110,8 @@ kegg = KEGG(species='hsa', storage_path='kegg_human.db')
 # Download all pathway annotations (first time only - takes ~2 minutes)
 kegg.download_annotations()
 # Output: Downloaded 8,000+ pathway-gene annotations
-<<<<<<< HEAD
 kegg.convert_ids_to_symbols()
-=======
 
->>>>>>> 0ad8423 (revise function)
 # Query pathways for a specific gene
 results = kegg.query_by_gene('TP53')
 print(f"TP53 is in {len(results)} pathways")
@@ -149,18 +146,58 @@ df_data = kegg.to_dataframe()
 
 ### Gene Ontology (GO)
 
+PathwayDB offers multiple ways to build and use GO annotations:
+
+#### Method 1: Download Fresh (Recommended for Production)
+
 ```python
 from pathwaydb import GO
 
-# Initialize GO client
+# Initialize GO client with local storage
 go = GO(storage_path='go_human.db')
 
 # Download GO annotations (first time only)
-# Term names are automatically populated from bundled data!
+# Term names are automatically populated!
 go.download_annotations(species='human')
-# Output: Downloaded 500,000+ gene-term annotations
-#         Populating GO term names from bundled data (instant!)
+# Output: Downloading GO annotations for human...
+#         Populating names for 18,000+ GO terms...
+#         ✓ All GO term names populated successfully!
 
+# Check database statistics
+print(go.stats())
+# {'total_annotations': 500000+, 'unique_genes': 20000+, 'unique_terms': 18000+}
+```
+
+#### Method 2: Use Centralized Cache (Share Across Projects)
+
+```python
+from pathwaydb import GO
+
+# Load from cache - downloads automatically if not cached
+go = GO.from_cache(species='human')
+# Uses ~/.pathwaydb_cache/go_annotations/go_human_cached.db
+
+# Or manually download to cache first
+from pathwaydb import download_to_cache, load_from_cache
+download_to_cache(species='human')  # Download once
+db = load_from_cache(species='human')  # Reuse in any project
+```
+
+#### Method 3: Auto-Detect Best Source
+
+```python
+from pathwaydb import GO
+
+# Automatically uses best available source:
+# 1. Bundled package data (instant, if available)
+# 2. User cache (~/.pathwaydb_cache/)
+# 3. Download fresh (if nothing found)
+go = GO.load(species='human')
+```
+
+#### Querying GO Annotations
+
+```python
 # Query GO terms for a specific gene
 annotations = go.query_by_gene('BRCA1')
 print(f"BRCA1 has {len(annotations)} GO annotations")
@@ -174,12 +211,10 @@ for ann in annotations[:3]:
 #   GO:0006355: regulation of transcription, DNA-templated [TAS]
 #   GO:0005515: protein binding [IPI]
 
-# NEW: Filter by term name (case-insensitive substring match)
+# Filter by term name (case-insensitive substring match)
 dna_repair = go.filter(term_name='DNA repair')
 apoptosis = go.filter(term_name='apoptosis')
-transcription = go.filter(term_name='transcription')
 print(f"Found {len(dna_repair)} DNA repair annotations")
-# Output: Found 45,234 DNA repair annotations
 
 # Filter by namespace (biological_process, molecular_function, cellular_component)
 bp_terms = go.filter(namespace='biological_process')
@@ -196,11 +231,30 @@ tp53_dna_exp = go.filter(
     evidence_codes=['EXP', 'IDA']
 )
 print(f"TP53 DNA-related (experimental): {len(tp53_dna_exp)}")
-# Output: TP53 DNA-related (experimental): 12
 
 # Export to DataFrame format
 df_data = go.to_dataframe()
 # Returns: [{'GeneID': 'BRCA1', 'TERM': 'GO:0006281', 'Aspect': 'P', 'Evidence': 'IBA'}, ...]
+```
+
+#### Term Name Sources
+
+GO term names are populated automatically from **bundled package data** (instant, no download needed!).
+
+The package includes ~1.5 MB of pre-compiled GO term name mappings, so term names are available immediately after downloading annotations.
+
+```python
+# Default behavior: uses bundled data (instant!)
+go.download_annotations(species='human')  # Term names included automatically
+
+# Skip term names if you don't need them
+go.download_annotations(species='human', fetch_term_names=False)
+
+# Manually populate term names with different sources
+go.populate_term_names(source='bundled')  # Use bundled data only (default, instant)
+go.populate_term_names(source='obo')      # Download GO OBO file (~35MB)
+go.populate_term_names(source='auto')     # Try bundled > OBO > QuickGO API
+go.populate_term_names(source='quickgo')  # Use QuickGO API only (slow)
 ```
 
 ### MSigDB Gene Sets
@@ -534,8 +588,38 @@ PathwayDB follows a clean 3-layer architecture:
 ### KEGG
 Use organism codes: `hsa` (human), `mmu` (mouse), `rno` (rat), `dme` (fly), `cel` (worm), `sce` (yeast), etc.
 
-### GO and MSigDB
-Use common names: `human`, `mouse`, `rat`, etc.
+### GO (Gene Ontology)
+Supported model organisms:
+
+| Category | Species | Name |
+|----------|---------|------|
+| **Mammals** | `human` | Homo sapiens |
+| | `mouse` | Mus musculus |
+| | `rat` | Rattus norvegicus |
+| | `pig` | Sus scrofa |
+| | `cow` | Bos taurus |
+| | `dog` | Canis familiaris |
+| | `chicken` | Gallus gallus |
+| **Fish** | `zebrafish` | Danio rerio |
+| **Invertebrates** | `fly` | Drosophila melanogaster |
+| | `worm` | Caenorhabditis elegans |
+| **Plants** | `arabidopsis` | Arabidopsis thaliana |
+| **Fungi** | `yeast` | Saccharomyces cerevisiae |
+
+```python
+from pathwaydb import get_supported_species
+
+# List all supported species
+print(get_supported_species())
+# ['arabidopsis', 'chicken', 'cow', 'dog', 'fly', 'human', 'mouse', 'pig', 'rat', 'worm', 'yeast', 'zebrafish']
+
+# Download for any supported species
+go = GO(storage_path='go_fly.db')
+go.download_annotations(species='fly')
+```
+
+### MSigDB
+Use common names: `human`, `mouse`.
 
 ## Development
 
