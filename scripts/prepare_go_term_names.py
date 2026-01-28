@@ -2,9 +2,15 @@
 """
 Prepare GO term name mapping for packaging.
 
+<<<<<<< HEAD
 This script fetches all GO term names and creates a lightweight mapping file
 that can be bundled with the package. Users get instant term name access
 without downloading the full GO database or calling QuickGO API.
+=======
+This script downloads the GO OBO file and creates a lightweight JSON mapping
+that can be bundled with the package. Users get instant term name access
+without downloading the full GO database or calling any API.
+>>>>>>> 0ad8423 (revise function)
 
 Usage:
     python scripts/prepare_go_term_names.py
@@ -17,6 +23,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+<<<<<<< HEAD
 from urllib.request import urlopen, Request
 from time import sleep
 
@@ -24,10 +31,19 @@ from time import sleep
 def fetch_all_go_terms(output_path: Path):
     """
     Fetch all GO terms and their names from QuickGO API.
+=======
+
+def fetch_all_go_terms_from_obo(output_path: Path):
+    """
+    Fetch all GO terms and their names from GO OBO file.
+
+    This is faster and more reliable than QuickGO API.
+>>>>>>> 0ad8423 (revise function)
 
     Args:
         output_path: Path to save the JSON mapping file
     """
+<<<<<<< HEAD
     print("=" * 70)
     print("Fetching GO Term Names from QuickGO API")
     print("=" * 70)
@@ -77,13 +93,29 @@ def fetch_all_go_terms(output_path: Path):
             break
 
     print(f"\n✓ Fetched {len(all_terms):,} GO terms")
+=======
+    from pathwaydb.storage.go_db import download_go_obo
+
+    print("=" * 70)
+    print("Fetching GO Term Names from OBO File")
+    print("=" * 70)
+
+    print(f"\nStep 1: Downloading and parsing GO OBO file...")
+    all_terms = download_go_obo()
+
+    print(f"\n✓ Parsed {len(all_terms):,} GO terms")
+>>>>>>> 0ad8423 (revise function)
 
     # Save to JSON
     print(f"\nStep 2: Saving to {output_path}")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_path, 'w', encoding='utf-8') as f:
+<<<<<<< HEAD
         json.dump(all_terms, f, indent=2, ensure_ascii=False)
+=======
+        json.dump(all_terms, f, separators=(',', ':'), ensure_ascii=False)
+>>>>>>> 0ad8423 (revise function)
 
     file_size = output_path.stat().st_size / 1024
     print(f"✓ Saved {len(all_terms):,} terms to {output_path}")
@@ -91,7 +123,13 @@ def fetch_all_go_terms(output_path: Path):
 
     # Sample terms
     print(f"\nSample terms:")
+<<<<<<< HEAD
     for i, (go_id, name) in enumerate(list(all_terms.items())[:5]):
+=======
+    sample_ids = ['GO:0006281', 'GO:0006974', 'GO:0007049', 'GO:0008150', 'GO:0003674']
+    for go_id in sample_ids:
+        name = all_terms.get(go_id, 'NOT FOUND')
+>>>>>>> 0ad8423 (revise function)
         print(f"  {go_id}: {name}")
 
     return all_terms
@@ -107,7 +145,11 @@ def main():
     print(f"Output file: {output_path}\n")
 
     # Fetch and save
+<<<<<<< HEAD
     terms = fetch_all_go_terms(output_path)
+=======
+    terms = fetch_all_go_terms_from_obo(output_path)
+>>>>>>> 0ad8423 (revise function)
 
     print("\n" + "=" * 70)
     print("Summary")

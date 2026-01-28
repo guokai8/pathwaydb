@@ -12,6 +12,7 @@ from pathwaydb import GO
 # Initialize GO with storage
 go = GO(storage_path='go_human.db')
 
+<<<<<<< HEAD
 # Step 1: Download annotations (if not already done)
 go.download_annotations(species='human')
 
@@ -19,11 +20,22 @@ go.download_annotations(species='human')
 go.populate_term_names()  # This is the KEY step!
 
 # Step 3: Filter by term name
+=======
+# Download annotations (term names are fetched automatically!)
+go.download_annotations(species='human')
+
+# Filter by term name - it just works!
+>>>>>>> 0ad8423 (revise function)
 dna_repair = go.filter(term_name='DNA repair')
 apoptosis = go.filter(term_name='apoptosis')
 transcription = go.filter(term_name='transcription')
 ```
 
+<<<<<<< HEAD
+=======
+**Note:** Term names are now **automatically fetched** during `download_annotations()` by default! No separate step needed.
+
+>>>>>>> 0ad8423 (revise function)
 ## Why This Feature?
 
 **Before:** You had to know GO IDs to filter
@@ -40,10 +52,19 @@ dna_repair = go.filter(term_name='DNA repair')
 
 ## How It Works
 
+<<<<<<< HEAD
 1. **Download Annotations**: Gets gene-to-GO mappings (GO IDs only)
 2. **Populate Term Names**: Fetches GO term descriptions from QuickGO API
 3. **Filter**: Search by substring match in term names
 
+=======
+1. **Download Annotations**: Gets gene-to-GO mappings from GAF files (GO IDs only)
+2. **Fetch Term Names** (Automatic): Fetches GO term descriptions from QuickGO API
+3. **Filter**: Search by substring match in term names
+
+**New in v0.2.0:** Term names are automatically fetched during download by default! The `populate_term_names()` method is now called automatically unless you set `fetch_term_names=False`.
+
+>>>>>>> 0ad8423 (revise function)
 ## Usage Examples
 
 ### Basic Filtering
@@ -183,6 +204,7 @@ go.populate_term_names()
 
 ## Best Practices
 
+<<<<<<< HEAD
 ### 1. Populate Term Names Once
 
 ```python
@@ -190,12 +212,36 @@ go.populate_term_names()
 go = GO(storage_path='go_human.db')
 go.download_annotations(species='human')
 go.populate_term_names()  # Takes a few minutes
+=======
+### 1. Download Once, Query Forever
+
+```python
+# Do this once when setting up (term names fetched automatically)
+go = GO(storage_path='go_human.db')
+go.download_annotations(species='human')  # Fetches term names automatically
+>>>>>>> 0ad8423 (revise function)
 
 # Then use the database forever
 go2 = GO(storage_path='go_human.db')
 results = go2.filter(term_name='DNA repair')  # Instant!
 ```
 
+<<<<<<< HEAD
+=======
+### 1b. Skip Automatic Term Name Fetching (Advanced)
+
+If you want to skip term name fetching and do it later:
+
+```python
+# Skip automatic term name fetching
+go = GO(storage_path='go_human.db')
+go.download_annotations(species='human', fetch_term_names=False)
+
+# Fetch term names later (optional)
+go.populate_term_names()
+```
+
+>>>>>>> 0ad8423 (revise function)
 ### 2. Use Specific Terms
 
 ```python
@@ -222,6 +268,7 @@ results = go.filter(
 
 ### "term_name is NULL"
 
+<<<<<<< HEAD
 You forgot to run `populate_term_names()`:
 
 ```python
@@ -230,6 +277,21 @@ go.download_annotations(species='human')
 go.populate_term_names()  # Don't forget this!
 ```
 
+=======
+This happens if you either:
+1. Downloaded annotations before v0.2.0 (when term names weren't automatic)
+2. Explicitly disabled term name fetching with `fetch_term_names=False`
+
+**Solution:** Manually populate term names:
+
+```python
+go = GO(storage_path='go_human.db')
+go.populate_term_names()  # Fetches and saves term names
+```
+
+This updates your existing database with term names without re-downloading all annotations.
+
+>>>>>>> 0ad8423 (revise function)
 ### No Results Found
 
 Try broader search terms:
@@ -257,12 +319,29 @@ GO term name filtering makes PathwayDB much more user-friendly:
 dna_repair = go.filter(go_ids=['GO:0006281'])
 ```
 
+<<<<<<< HEAD
 **After:**
 ```python
 # Easy and intuitive!
+=======
+**After (v0.2.0+):**
+```python
+# Easy and intuitive - term names are automatic!
+go = GO(storage_path='go_human.db')
+go.download_annotations(species='human')  # Term names included automatically
+
+>>>>>>> 0ad8423 (revise function)
 dna_repair = go.filter(term_name='DNA repair')
 apoptosis = go.filter(term_name='apoptosis')
 tp53_dna = go.filter(gene_symbols=['TP53'], term_name='DNA')
 ```
 
+<<<<<<< HEAD
+=======
+**Key Points:**
+- ✅ Term names are **automatically fetched** during download (no separate step needed!)
+- ✅ Just like KEGG pathway name filtering - consistent API across all databases
+- ✅ Can still use `populate_term_names()` manually if needed (e.g., updating old databases)
+
+>>>>>>> 0ad8423 (revise function)
 Now GO filtering is as easy as KEGG pathway name filtering! 🎉

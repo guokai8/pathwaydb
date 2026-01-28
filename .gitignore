@@ -1,0 +1,93 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+
+# Database files (local development)
+*.db
+*.sqlite
+*.sqlite3
+
+# BUT keep package data directory structure (not the .db files)
+!pathwaydb/data/
+!pathwaydb/data/go_annotations/
+!pathwaydb/data/go_annotations/.gitkeep
+
+# Cache directories
+.cache/
+.pathwaydb_cache/
+.bioanno_cache/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+*.log
+
+# Distribution / packaging
+*.tar.gz
+
+# Environment variables
+.env
+.env.local
+
+# Claude Code settings (keep local only)
+.claude/settings.local.json
+
+# local assistant file
+CLAUDE.md
+
+# tests (top-level)
+test*.py

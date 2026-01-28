@@ -63,8 +63,12 @@ data = kegg.to_dataframe()
 from pathwaydb import GO
 
 go = GO(storage_path='go_human.db')
+<<<<<<< HEAD
 go.download_annotations(species='human')
 go.populate_term_names()  # ONE-TIME SETUP for term name filtering
+=======
+go.download_annotations(species='human')  # Term names fetched automatically (v0.2.0+)
+>>>>>>> 0ad8423 (revise function)
 
 results = go.filter(
     gene_symbols=['TP53', 'BRCA1'],      # Exact match
@@ -160,7 +164,11 @@ data = msigdb.to_dataframe(collection='H')
 | **Filter by quality** | ❌ | ✅ `evidence_codes` | ❌ |
 | **Filter by organism** | ✅ | ❌ (set at download) | ✅ |
 | **DataFrame export** | ✅ | ✅ | ✅ |
+<<<<<<< HEAD
 | **Setup required** | ❌ None | ⚠️ Run `populate_term_names()` once | ❌ None |
+=======
+| **Setup required** | ❌ None | ✅ Automatic (v0.2.0+) | ❌ None |
+>>>>>>> 0ad8423 (revise function)
 
 ## Common Use Cases
 
@@ -336,10 +344,18 @@ print(f"TP53 in {len(tp53_go_exp)} GO terms (experimental evidence)")
 
 ### GO-Specific
 
+<<<<<<< HEAD
 - **IMPORTANT**: Run `populate_term_names()` once for term name filtering
 - Use specific terms - 'DNA repair' is better than just 'repair'
 - Combine with evidence codes for high-quality annotations
 - Use namespace to filter by biological_process, molecular_function, cellular_component
+=======
+- **v0.2.0+**: Term names are automatically fetched during download (no manual step needed!)
+- Use specific terms - 'DNA repair' is better than just 'repair'
+- Combine with evidence codes for high-quality annotations
+- Use namespace to filter by biological_process, molecular_function, cellular_component
+- For old databases: Run `go.populate_term_names()` to add term names
+>>>>>>> 0ad8423 (revise function)
 
 ### MSigDB-Specific
 
@@ -365,14 +381,28 @@ PathwayDB provides **consistent, intuitive filtering** across all three major an
 # KEGG - No setup required
 kegg.filter(pathway_name='cancer')
 
+<<<<<<< HEAD
 # GO - One-time setup
 go.populate_term_names()  # Run once
 go.filter(term_name='DNA repair')  # Then use forever
+=======
+# GO - Automatic setup (v0.2.0+)
+go.download_annotations(species='human')  # Term names fetched automatically
+go.filter(term_name='DNA repair')
+>>>>>>> 0ad8423 (revise function)
 
 # MSigDB - No setup required
 msigdb.filter(gene_set_name='apoptosis')
 ```
 
+<<<<<<< HEAD
+=======
+**What's New in v0.2.0:**
+- ✅ GO term names are **automatically fetched** during download
+- ✅ No separate `populate_term_names()` step needed
+- ✅ Consistent, zero-setup experience across all databases
+
+>>>>>>> 0ad8423 (revise function)
 All databases support:
 - Case-insensitive substring matching
 - Filtering by gene symbols

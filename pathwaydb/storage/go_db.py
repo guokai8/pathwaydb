@@ -2,7 +2,11 @@
 import gzip
 import sqlite3
 from typing import List, Optional, Dict, Union
+<<<<<<< HEAD
 from urllib.request import urlopen
+=======
+from urllib.request import urlopen, Request
+>>>>>>> 0ad8423 (revise function)
 from dataclasses import dataclass, asdict
 
 
@@ -259,6 +263,7 @@ class GOAnnotationDB:
 
         return dict(cursor.fetchone())
 
+<<<<<<< HEAD
     def populate_term_names(self, use_bundled_data: bool = True):
         """
         Populate GO term names in the database.
@@ -269,6 +274,23 @@ class GOAnnotationDB:
         Args:
             use_bundled_data: If True, use bundled package data (default: True)
                              Set to False to force QuickGO API calls
+=======
+    def populate_term_names(self, source: str = 'auto'):
+        """
+        Populate GO term names in the database.
+
+        Args:
+            source: Source for term names. Options:
+                - 'auto': Try bundled data first, then OBO file, then QuickGO API (default)
+                - 'obo': Download and parse GO OBO file (recommended, ~35MB download)
+                - 'bundled': Use bundled package data only
+                - 'quickgo': Use QuickGO API only (slow, may have rate limits)
+
+        Example:
+            >>> db = GOAnnotationDB('go_human.db')
+            >>> db.populate_term_names()  # Auto-detect best source
+            >>> db.populate_term_names(source='obo')  # Force OBO file
+>>>>>>> 0ad8423 (revise function)
         """
         import json
         import time
@@ -283,9 +305,17 @@ class GOAnnotationDB:
 
         print(f"Populating names for {len(go_ids)} GO terms...")
 
+<<<<<<< HEAD
         # Try bundled data first
         total_updated = 0
         if use_bundled_data:
+=======
+        total_updated = 0
+        remaining_ids = go_ids
+
+        # Step 1: Try bundled data first (if auto or bundled)
+        if source in ('auto', 'bundled'):
+>>>>>>> 0ad8423 (revise function)
             try:
                 from ..data import load_go_term_names, has_go_term_names
 
@@ -293,8 +323,12 @@ class GOAnnotationDB:
                     print("  Using bundled term name data (instant!)...")
                     term_names = load_go_term_names()
 
+<<<<<<< HEAD
                     # Update all terms from bundled data
                     for go_id in go_ids:
+=======
+                    for go_id in remaining_ids:
+>>>>>>> 0ad8423 (revise function)
                         term_name = term_names.get(go_id)
                         if term_name:
                             self.conn.execute(
@@ -306,6 +340,7 @@ class GOAnnotationDB:
                     self.conn.commit()
                     print(f"  ✓ Updated {total_updated}/{len(go_ids)} terms from bundled data")
 
+<<<<<<< HEAD
                     # Check if we got all terms
                     cursor = self.conn.execute("SELECT DISTINCT go_id FROM go_annotations WHERE term_name IS NULL")
                     remaining = [row[0] for row in cursor.fetchall()]
@@ -335,11 +370,89 @@ class GOAnnotationDB:
 
             for i in range(0, len(go_ids), batch_size):
                 batch = go_ids[i:i+batch_size]
+=======
+                    # Check remaining
+                    cursor = self.conn.execute("SELECT DISTINCT go_id FROM go_annotations WHERE term_name IS NULL")
+                    remaining_ids = [row[0] for row in cursor.fetchall()]
+
+                    if not remaining_ids:
+                        print(f"✓ All GO term names populated successfully!")
+                        return
+
+                    if source == 'bundled':
+                        print(f"  Note: {len(remaining_ids)} terms not found in bundled data")
+                        return
+                else:
+                    if source == 'bundled':
+                        print("  Warning: Bundled term name data not found")
+                        return
+
+            except Exception as e:
+                if source == 'bundled':
+                    print(f"  Error: Could not use bundled data: {e}")
+                    return
+                print(f"  Note: Bundled data not available: {e}")
+
+        # Step 2: Try OBO file (if auto or obo)
+        if source in ('auto', 'obo') and remaining_ids:
+            try:
+                print("  Downloading GO OBO file (contains all term names)...")
+                term_names = download_go_obo()
+
+                obo_updated = 0
+                for go_id in remaining_ids:
+                    term_name = term_names.get(go_id)
+                    if term_name:
+                        self.conn.execute(
+                            "UPDATE go_annotations SET term_name = ? WHERE go_id = ?",
+                            (term_name, go_id)
+                        )
+                        obo_updated += 1
+
+                self.conn.commit()
+                total_updated += obo_updated
+                print(f"  ✓ Updated {obo_updated} terms from GO OBO file")
+
+                # Check remaining
+                cursor = self.conn.execute("SELECT DISTINCT go_id FROM go_annotations WHERE term_name IS NULL")
+                remaining_ids = [row[0] for row in cursor.fetchall()]
+
+                if not remaining_ids:
+                    print(f"✓ All GO term names populated successfully!")
+                    return
+
+                if source == 'obo':
+                    if remaining_ids:
+                        print(f"  Note: {len(remaining_ids)} terms not found in OBO file (may be obsolete)")
+                    return
+
+            except Exception as e:
+                if source == 'obo':
+                    print(f"  Error downloading OBO file: {e}")
+                    return
+                print(f"  Note: OBO file not available: {e}")
+
+        # Step 3: Try QuickGO API (if auto or quickgo)
+        if source in ('auto', 'quickgo') and remaining_ids:
+            print(f"  Fetching {len(remaining_ids)} terms from QuickGO API...")
+            base_url = "https://www.ebi.ac.uk/QuickGO/services/ontology/go/terms"
+
+            batch_size = 100
+            api_updated = 0
+
+            for i in range(0, len(remaining_ids), batch_size):
+                batch = remaining_ids[i:i+batch_size]
+>>>>>>> 0ad8423 (revise function)
                 ids_param = ",".join(batch)
 
                 try:
                     url = f"{base_url}/{ids_param}"
+<<<<<<< HEAD
                     with urlopen(url, timeout=30) as response:
+=======
+                    request = Request(url, headers={'User-Agent': 'pathwaydb/0.2.0 (Python)'})
+                    with urlopen(request, timeout=30) as response:
+>>>>>>> 0ad8423 (revise function)
                         data = json.loads(response.read().decode('utf-8'))
 
                         if 'results' in data:
@@ -355,6 +468,7 @@ class GOAnnotationDB:
                                     api_updated += 1
 
                     self.conn.commit()
+<<<<<<< HEAD
                     print(f"    Processed {min(i+batch_size, len(go_ids))}/{len(go_ids)} terms from API...")
 
                     # Rate limiting
@@ -362,6 +476,14 @@ class GOAnnotationDB:
 
                 except Exception as e:
                     print(f"    Warning: Failed to fetch batch {i//batch_size + 1}: {e}")
+=======
+                    print(f"    Processed {min(i+batch_size, len(remaining_ids))}/{len(remaining_ids)} terms...")
+
+                    time.sleep(0.2)  # Rate limiting
+
+                except Exception as e:
+                    print(f"    Warning: Failed to fetch batch: {e}")
+>>>>>>> 0ad8423 (revise function)
                     continue
 
             total_updated += api_updated
@@ -422,9 +544,17 @@ def download_go_annotations_filtered(
     
     print(f"Downloading GO annotations from {url}...")
     count = 0
+<<<<<<< HEAD
     
     try:
         with urlopen(url, timeout=300) as response:
+=======
+
+    try:
+        # Add User-Agent header to avoid 403 Forbidden errors
+        request = Request(url, headers={'User-Agent': 'pathwaydb/0.2.0 (Python)'})
+        with urlopen(request, timeout=300) as response:
+>>>>>>> 0ad8423 (revise function)
             with gzip.open(response, 'rt') as f:
                 for line in f:
                     if line.startswith('!'):
@@ -469,6 +599,91 @@ def load_go_annotations(db_path: str) -> GOAnnotationDB:
     return GOAnnotationDB(db_path)
 
 
+<<<<<<< HEAD
+=======
+def download_go_obo(cache_dir: Optional[str] = None) -> Dict[str, str]:
+    """
+    Download and parse GO OBO file to get all GO term names.
+
+    This is a reliable alternative to QuickGO API - downloads the official
+    GO ontology file (~35MB) and parses term IDs and names.
+
+    Args:
+        cache_dir: Directory to cache the OBO file. If None, uses ~/.pathwaydb_cache/
+
+    Returns:
+        Dict mapping GO IDs to term names (e.g., {'GO:0006281': 'DNA repair'})
+
+    Example:
+        >>> term_names = download_go_obo()
+        >>> print(term_names['GO:0006281'])
+        'DNA repair'
+    """
+    from pathlib import Path
+    import os
+
+    # Setup cache directory
+    if cache_dir is None:
+        cache_dir = Path.home() / '.pathwaydb_cache'
+    else:
+        cache_dir = Path(cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    obo_path = cache_dir / 'go-basic.obo'
+    obo_url = 'http://purl.obolibrary.org/obo/go/go-basic.obo'
+
+    # Download OBO file if not cached or if it's older than 30 days
+    should_download = True
+    if obo_path.exists():
+        import time
+        file_age_days = (time.time() - obo_path.stat().st_mtime) / (60 * 60 * 24)
+        if file_age_days < 30:
+            should_download = False
+            print(f"  Using cached GO OBO file ({file_age_days:.1f} days old)")
+
+    if should_download:
+        print(f"  Downloading GO OBO file from {obo_url}...")
+        request = Request(obo_url, headers={'User-Agent': 'pathwaydb/0.2.0 (Python)'})
+        with urlopen(request, timeout=300) as response:
+            with open(obo_path, 'wb') as f:
+                f.write(response.read())
+        print(f"  ✓ Downloaded GO OBO file to {obo_path}")
+
+    # Parse OBO file
+    print("  Parsing GO term names from OBO file...")
+    term_names = {}
+    current_id = None
+    current_name = None
+    is_obsolete = False
+
+    with open(obo_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+
+            if line == '[Term]':
+                # Save previous term if valid
+                if current_id and current_name and not is_obsolete:
+                    term_names[current_id] = current_name
+                # Reset for new term
+                current_id = None
+                current_name = None
+                is_obsolete = False
+            elif line.startswith('id: GO:'):
+                current_id = line[4:]  # Remove 'id: ' prefix
+            elif line.startswith('name: '):
+                current_name = line[6:]  # Remove 'name: ' prefix
+            elif line == 'is_obsolete: true':
+                is_obsolete = True
+
+        # Don't forget the last term
+        if current_id and current_name and not is_obsolete:
+            term_names[current_id] = current_name
+
+    print(f"  ✓ Parsed {len(term_names):,} GO term names")
+    return term_names
+
+
+>>>>>>> 0ad8423 (revise function)
 def get_cache_path(species: str = 'human') -> str:
     """Get the default cache path for GO annotations."""
     from pathlib import Path

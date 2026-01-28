@@ -75,13 +75,18 @@ results = go.filter(
 
 ### Setup Required
 
+<<<<<<< HEAD
 **ONE-TIME SETUP** to enable term name filtering:
+=======
+**v0.2.0+:** Term names are automatically fetched during download!
+>>>>>>> 0ad8423 (revise function)
 
 ```python
 from pathwaydb import GO
 
 go = GO(storage_path='go_human.db')
 
+<<<<<<< HEAD
 # Step 1: Download annotations
 go.download_annotations(species='human')
 
@@ -92,6 +97,24 @@ go.populate_term_names()
 dna_repair = go.filter(term_name='DNA repair')
 ```
 
+=======
+# Download annotations (term names fetched automatically)
+go.download_annotations(species='human')
+
+# Filter by term name - it just works!
+dna_repair = go.filter(term_name='DNA repair')
+```
+
+**Optional:** Skip automatic term name fetching if needed:
+```python
+# Advanced: skip automatic fetching
+go.download_annotations(species='human', fetch_term_names=False)
+
+# Fetch later if needed
+go.populate_term_names()
+```
+
+>>>>>>> 0ad8423 (revise function)
 ### Examples
 
 ```python
@@ -177,7 +200,11 @@ print(f"TP53 in {len(tp53_dna_repair)} DNA repair annotations")
 | **Filter by ID** | ✅ `pathway_ids` | ✅ `go_ids` |
 | **Filter by category** | ❌ | ✅ `namespace`/`aspect` |
 | **Filter by quality** | ❌ | ✅ `evidence_codes` |
+<<<<<<< HEAD
 | **Setup required** | ❌ None | ⚠️ Run `populate_term_names()` once |
+=======
+| **Setup required** | ❌ None | ✅ Automatic (v0.2.0+) |
+>>>>>>> 0ad8423 (revise function)
 | **Data source** | KEGG API | GAF files + QuickGO API |
 
 ## Common Use Cases
@@ -284,9 +311,22 @@ Both KEGG and GO now support **intuitive description-based filtering**:
 # KEGG - No setup required
 kegg.filter(pathway_name='cancer')
 
+<<<<<<< HEAD
 # GO - One-time setup
 go.populate_term_names()  # Run once
 go.filter(term_name='DNA repair')  # Then use forever
 ```
 
+=======
+# GO - Automatic setup (v0.2.0+)
+go.download_annotations(species='human')  # Term names fetched automatically
+go.filter(term_name='DNA repair')
+```
+
+**What's New in v0.2.0:**
+- ✅ GO term names are **automatically fetched** during download
+- ✅ No separate `populate_term_names()` step needed (runs automatically)
+- ✅ Consistent, user-friendly API across both databases
+
+>>>>>>> 0ad8423 (revise function)
 This makes PathwayDB much more user-friendly - no need to remember IDs, just search by description! 🎉

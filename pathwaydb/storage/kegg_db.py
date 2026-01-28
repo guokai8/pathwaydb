@@ -3,7 +3,11 @@ import sqlite3
 from pathlib import Path
 from typing import List, Dict, Optional, Union
 from dataclasses import dataclass, asdict
+<<<<<<< HEAD
 from urllib.request import urlopen
+=======
+from urllib.request import urlopen, Request
+>>>>>>> 0ad8423 (revise function)
 
 
 @dataclass
@@ -349,7 +353,12 @@ def download_kegg_annotations(
     
     try:
         print("Fetching pathway names...")
+<<<<<<< HEAD
         with urlopen(pathway_url, timeout=300) as response:
+=======
+        request = Request(pathway_url, headers={'User-Agent': 'pathwaydb/0.2.0 (Python)'})
+        with urlopen(request, timeout=300) as response:
+>>>>>>> 0ad8423 (revise function)
             for line in response:
                 line = line.decode('utf-8').strip()
                 if not line:
@@ -373,7 +382,12 @@ def download_kegg_annotations(
     
     try:
         print("Downloading pathway-gene links...")
+<<<<<<< HEAD
         with urlopen(link_url, timeout=300) as response:
+=======
+        request = Request(link_url, headers={'User-Agent': 'pathwaydb/0.2.0 (Python)'})
+        with urlopen(request, timeout=300) as response:
+>>>>>>> 0ad8423 (revise function)
             for line in response:
                 line = line.decode('utf-8').strip()
                 if not line:
