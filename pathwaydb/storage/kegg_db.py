@@ -52,6 +52,7 @@ class KEGGAnnotationDB:
     
     def _create_tables(self):
         """Create annotation tables with indexes."""
+        # Create base tables
         self.conn.executescript("""
             CREATE TABLE IF NOT EXISTS kegg_annotations (
                 gene_id TEXT NOT NULL,
@@ -59,9 +60,6 @@ class KEGGAnnotationDB:
                 pathway_id TEXT NOT NULL,
                 pathway_name TEXT,
                 organism TEXT,
-                level1 TEXT,
-                level2 TEXT,
-                level3 TEXT,
                 PRIMARY KEY (gene_id, pathway_id)
             );
 
@@ -69,8 +67,6 @@ class KEGGAnnotationDB:
             CREATE INDEX IF NOT EXISTS idx_kegg_gene_symbol ON kegg_annotations(gene_symbol);
             CREATE INDEX IF NOT EXISTS idx_kegg_pathway_id ON kegg_annotations(pathway_id);
             CREATE INDEX IF NOT EXISTS idx_kegg_organism ON kegg_annotations(organism);
-            CREATE INDEX IF NOT EXISTS idx_kegg_level1 ON kegg_annotations(level1);
-            CREATE INDEX IF NOT EXISTS idx_kegg_level2 ON kegg_annotations(level2);
 
             CREATE TABLE IF NOT EXISTS pathway_hierarchy (
                 pathway_id TEXT PRIMARY KEY,
@@ -85,6 +81,32 @@ class KEGGAnnotationDB:
                 value TEXT
             );
         """)
+        self.conn.commit()
+
+        # Migrate existing databases: add hierarchy columns if missing
+        self._migrate_add_hierarchy_columns()
+
+    def _migrate_add_hierarchy_columns(self):
+        """Add hierarchy columns to existing databases (migration)."""
+        # Check if columns exist
+        cursor = self.conn.execute("PRAGMA table_info(kegg_annotations)")
+        existing_columns = {row[1] for row in cursor.fetchall()}
+
+        # Add missing columns
+        for col in ['level1', 'level2', 'level3']:
+            if col not in existing_columns:
+                try:
+                    self.conn.execute(f"ALTER TABLE kegg_annotations ADD COLUMN {col} TEXT")
+                except Exception:
+                    pass  # Column might already exist
+
+        # Create indexes for new columns
+        try:
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_kegg_level1 ON kegg_annotations(level1)")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_kegg_level2 ON kegg_annotations(level2)")
+        except Exception:
+            pass
+
         self.conn.commit()
     
     def insert_batch(self, records: List[KEGGAnnotationRecord]):
